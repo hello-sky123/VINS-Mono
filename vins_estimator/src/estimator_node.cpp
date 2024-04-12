@@ -38,7 +38,7 @@ Eigen::Vector3d gyr_0{0, 0, 0};
 bool init_feature = false;
 bool init_imu = true;
 double last_imu_t = 0;
-ofstream ofs("/home/zhang/vins_estimator.txt", ios::app);
+
 // 根据imu数据预测位姿，系统未初始化前，tmp_P, tmp_Q, tmp_V, tmp_Ba, tmp_Bg值都是不对的，他们的作用是在初始化完成以后，发布最新的里程计结果
 void predict(const sensor_msgs::ImuConstPtr& imu_msg)
 {

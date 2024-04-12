@@ -71,23 +71,23 @@ class Estimator
    Matrix3d ric[NUM_OF_CAM];
    Vector3d tic[NUM_OF_CAM];
 
-   Vector3d Ps[(WINDOW_SIZE + 1)];
-   Vector3d Vs[(WINDOW_SIZE + 1)];
-   Matrix3d Rs[(WINDOW_SIZE + 1)];
-   Vector3d Bas[(WINDOW_SIZE + 1)];
-   Vector3d Bgs[(WINDOW_SIZE + 1)];
+   Vector3d Ps[WINDOW_SIZE + 1];
+   Vector3d Vs[WINDOW_SIZE + 1];
+   Matrix3d Rs[WINDOW_SIZE + 1];
+   Vector3d Bas[WINDOW_SIZE + 1];
+   Vector3d Bgs[WINDOW_SIZE + 1];
    double td;
 
    Matrix3d back_R0, last_R, last_R0;
    Vector3d back_P0, last_P, last_P0;
-   std_msgs::Header Headers[(WINDOW_SIZE + 1)];
+   std_msgs::Header Headers[WINDOW_SIZE + 1];
 
-   IntegrationBase* pre_integrations[(WINDOW_SIZE + 1)]; // 指向IntegrationBase的指针数组
+   IntegrationBase* pre_integrations[WINDOW_SIZE + 1]; // 指向IntegrationBase的指针数组
    Vector3d acc_0, gyr_0; // 前一个IMU数据
 
-   vector<double> dt_buf[(WINDOW_SIZE + 1)];
-   vector<Vector3d> linear_acceleration_buf[(WINDOW_SIZE + 1)];
-   vector<Vector3d> angular_velocity_buf[(WINDOW_SIZE + 1)];
+   vector<double> dt_buf[WINDOW_SIZE + 1];
+   vector<Vector3d> linear_acceleration_buf[WINDOW_SIZE + 1];
+   vector<Vector3d> angular_velocity_buf[WINDOW_SIZE + 1];
 
    int frame_count;
    int sum_of_outlier, sum_of_back, sum_of_front, sum_of_invalid;

@@ -2,6 +2,7 @@
 
 #include <utility>
 
+ofstream ofs("/home/zhang/vins_estimator.txt", ios::app);
 Estimator::Estimator(): f_manager{Rs}
 {
   ROS_INFO("init begins");
@@ -85,7 +86,7 @@ void Estimator::clearState()
 
 void Estimator::processIMU(double dt, const Vector3d& linear_acceleration, const Vector3d& angular_velocity)
 {
-  if (!first_imu)
+  if (!first_imu) // 第一帧IMU数据
   {
     first_imu = true;
     acc_0 = linear_acceleration;
@@ -105,21 +106,21 @@ void Estimator::processIMU(double dt, const Vector3d& linear_acceleration, const
     tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity); // 用于初始化
 
     // 保存数据
-    dt_buf[frame_count].push_back(dt);
+    dt_buf[frame_count].push_back(dt); // 保存这一帧图像与上一帧图像之间的imu数据
     linear_acceleration_buf[frame_count].push_back(linear_acceleration);
     angular_velocity_buf[frame_count].push_back(angular_velocity);
 
     // 使用imu的数据更新滑窗内的P、V、Q，为非线性优化提供初始值
     int j = frame_count;
-    Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g; // Rs存的是滑窗内各帧在世界坐标系下的旋转
+    Vector3d un_acc_0 = Rs[j] * (acc_0 - Bas[j]) - g; // Rs存的是世界坐标系到imu坐标系的旋转
     Vector3d un_gyr = 0.5 * (gyr_0 + angular_velocity) - Bgs[j];
-    Rs[j] *= Utility::deltaQ(un_gyr * dt).toRotationMatrix();
+    Rs[j] *= Utility::deltaQ(un_gyr * dt).toRotationMatrix(); // Rs,Ps,Vs应该是上一帧的值
     Vector3d un_acc_1 = Rs[j] * (linear_acceleration - Bas[j]) - g;
     Vector3d un_acc = 0.5 * (un_acc_0 + un_acc_1);
     Ps[j] += dt * Vs[j] + 0.5 * dt * dt * un_acc;
     Vs[j] += dt * un_acc;
   }
-  acc_0 = linear_acceleration;
+  acc_0 = linear_acceleration; // 每次运行完的值都是等于图像当前图像时刻的值或者是最近的大于当前图像时刻的值
   gyr_0 = angular_velocity;
 }
 
@@ -139,15 +140,15 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
   ROS_DEBUG("%s", marginalization_flag ? "Non-keyframe" : "Keyframe");
   ROS_DEBUG("Solving %d", frame_count);
   ROS_DEBUG("number of feature: %d", f_manager.getFeatureCount());
-  Headers[frame_count] = header;
+  Headers[frame_count] = header; // 保存滑窗内图像帧的时间戳
 
+  ImageFrame imageframe(image, header.stamp.toSec()); // 初始化做图像IMU对齐的类，保存了图像帧的信息
+  imageframe.pre_integration = tmp_pre_integration; // 将前面构造好的预积分类赋给当前帧，滑窗内的第一帧的预积分是用不到的，因此是nullptr
+  // stamp->imageFrame
   // all_image_frame用来做初始化相关的操作，保存了滑窗内起始到当前的所有的图像帧信息
   // 有一些帧因为不是KF，被MARGIN_SECOND_NEW移除了，但是还是保存在all_image_frame中，因为初始化要求使用所有的图像帧，而非只要KF
-  ImageFrame imageframe(image, header.stamp.toSec()); // 初始化做图像IMU对齐的类
-  imageframe.pre_integration = tmp_pre_integration;
-  // stamp->imageFrame
   all_image_frame.insert(make_pair(header.stamp.toSec(), imageframe));
-  tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]};
+  tmp_pre_integration = new IntegrationBase{acc_0, gyr_0, Bas[frame_count], Bgs[frame_count]}; // 创建新的预积分对象，用于计算这一帧与下一帧之间的预积分
 
   // 没有外参初值
   // step2: 外参初始化

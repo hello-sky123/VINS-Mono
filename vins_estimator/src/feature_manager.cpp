@@ -56,6 +56,7 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
 
     int feature_id = id_pts.first;
     // 在feature中查找是否有id为feature_id的该特征点
+    // feature保存了特征管理器管理的所有特征点
     auto it = find_if(feature.begin(), feature.end(), [feature_id](const FeaturePerId& it)
     {
       return it.feature_id == feature_id;
@@ -80,7 +81,7 @@ bool FeatureManager::addFeatureCheckParallax(int frame_count, const map<int, vec
   for (auto& it_per_id: feature)
   {
     // 判断前一帧是否是关键帧，因此，起始帧至少是frame_count - 2，同时至少覆盖到frame_count - 1帧
-    // it_per_id.feature_per_frame.size()表示该特征点在滑窗内的观测次数
+    // it_per_id.feature_per_frame.size()表示该特征点在滑窗内的观测次数, start_frame最大为WINDOW_SIZE - 2 = 8
     if (it_per_id.start_frame <= frame_count - 2 &&
       it_per_id.start_frame + int(it_per_id.feature_per_frame.size()) - 1 >= frame_count - 1)
     {                 // 计算parallax between second last frame and third last frame

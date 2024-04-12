@@ -44,10 +44,10 @@ void CameraPoseVisualization::setOpticalCenterConnectorColor(float r, float g, f
 }
 
 void CameraPoseVisualization::setScale(double s) {
-    m_scale = s;
+  m_scale = s;
 }
 void CameraPoseVisualization::setLineWidth(double width) {
-    m_line_width = width;
+  m_line_width = width;
 }
 void CameraPoseVisualization::add_edge(const Eigen::Vector3d& p0, const Eigen::Vector3d& p1){
     visualization_msgs::Marker marker;

@@ -2,6 +2,8 @@
 #include <ros/ros.h>
 #include <opencv2/highgui/highgui.hpp>
 
+// extern关键字的作用主要有两个：1. 声明一个全局变量或函数，以便在其他文件中使用；
+// 2. 告诉编译器该变量或函数在别的文件中定义
 extern int ROW;
 extern int COL;
 extern int FOCAL_LENGTH;
@@ -23,4 +25,4 @@ extern int EQUALIZE;
 extern int FISHEYE;
 extern bool PUB_THIS_FRAME;
 
-void readParameters(ros::NodeHandle &n);
+void readParameters(ros::NodeHandle& n);

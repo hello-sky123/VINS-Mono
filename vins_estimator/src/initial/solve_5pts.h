@@ -14,7 +14,7 @@ class MotionEstimator
 {
   public:
 
-    bool solveRelativeRT(const vector<pair<Vector3d, Vector3d>> &corres, Matrix3d &R, Vector3d &T);
+    static bool solveRelativeRT(const vector<pair<Vector3d, Vector3d>> &corres, Matrix3d &R, Vector3d &T);
 
   private:
     double testTriangulation(const vector<cv::Point2f> &l,

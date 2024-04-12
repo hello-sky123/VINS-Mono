@@ -10,18 +10,18 @@ namespace camodocal
 
 class ChessboardQuad;
 typedef boost::shared_ptr<ChessboardQuad> ChessboardQuadPtr;
-
+// 棋盘格里的小四边形
 class ChessboardQuad
 {
-public:
-    ChessboardQuad() : count(0), group_idx(-1), edge_len(FLT_MAX), labeled(false) {}
+ public:
+   ChessboardQuad() : count(0), group_idx(-1), edge_len(FLT_MAX), labeled(false) {} // FLT_MAX表示正float的最大值
 
-    int count;                         // Number of quad neighbors
-    int group_idx;                     // Quad group ID
-    float edge_len;                    // Smallest side length^2
-    ChessboardCornerPtr corners[4];    // Coordinates of quad corners
-    ChessboardQuadPtr neighbors[4];    // Pointers of quad neighbors
-    bool labeled;                      // Has this corner been labeled?
+   int count;                         // Number of quad neighbors
+   int group_idx;                     // Quad group ID
+   float edge_len;                    // Smallest side length^2
+   ChessboardCornerPtr corners[4];    // Coordinates of quad corners
+   ChessboardQuadPtr neighbors[4];    // Pointers of quad neighbors
+   bool labeled;                      // Has this corner been labeled?
 };
 
 }

@@ -2,325 +2,316 @@
 
 #include <opencv2/calib3d/calib3d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <utility>
+#include <opencv2/imgproc/types_c.h>
+#include <opencv2/calib3d/calib3d_c.h>
 
 #include "camodocal/chessboard/ChessboardQuad.h"
 #include "camodocal/chessboard/Spline.h"
 
-#define MAX_CONTOUR_APPROX  7
+#define MAX_CONTOUR_APPROX  7 // 轮廓近似的像素点数目
 
 namespace camodocal
 {
 
 Chessboard::Chessboard(cv::Size boardSize, cv::Mat& image)
- : mBoardSize(boardSize)
- , mCornersFound(false)
+: mBoardSize(std::move(boardSize)), mCornersFound(false)
 {
-    if (image.channels() == 1)
-    {
-        cv::cvtColor(image, mSketch, CV_GRAY2BGR);
-        image.copyTo(mImage);
-    }
-    else
-    {
-        image.copyTo(mSketch);
-        cv::cvtColor(image, mImage, CV_BGR2GRAY);
-    }
+  if (image.channels() == 1) // 灰度图
+  {                                         // 将原始的灰度值复制到BGR图像的每一个通道，它会看起来和原始的灰度图像非常相似
+    cv::cvtColor(image, mSketch, cv::COLOR_GRAY2BGR); // cvtColor()函数用于图像色彩空间的转换
+    image.copyTo(mImage);
+  }
+  else
+  {
+    image.copyTo(mSketch);
+    cv::cvtColor(image, mImage, cv::COLOR_BGR2GRAY);
+  }
 }
 
-void
-Chessboard::findCorners(bool useOpenCV)
-{
-    mCornersFound = findChessboardCorners(mImage, mBoardSize, mCorners,
-                                          CV_CALIB_CB_ADAPTIVE_THRESH +
-                                          CV_CALIB_CB_NORMALIZE_IMAGE +
-                                          CV_CALIB_CB_FILTER_QUADS +
-                                          CV_CALIB_CB_FAST_CHECK,
-                                          useOpenCV);
+void Chessboard::findCorners(bool useOpenCV) // 检测棋盘格角点，useOpenCV表示是否使用OpenCV自带的函数
+{                                       // patternSize棋盘格的尺寸（内部角点数）。例如，对于一个8x8的棋盘格，这个尺寸应该是7x7（因为角点数量比方格数量少1）
+  mCornersFound = findChessboardCorners(mImage, mBoardSize, mCorners,
+                                        CV_CALIB_CB_ADAPTIVE_THRESH +  // 使用自适应阈值来将灰度图像转换为二值图像，这对于由于光线不均匀导致的图像亮度变化很有用
+                                        CV_CALIB_CB_NORMALIZE_IMAGE +       // 是否使用直方图均衡化来对图像进行预处理来增加对比度
+                                        CV_CALIB_CB_FILTER_QUADS +          // 对检测到的四边形进行额外的滤波，去除一些不合格的四边形
+                                        CV_CALIB_CB_FAST_CHECK,             // 进行一个快速检测，如果图像不符合棋盘格的规则，则快速拒绝掉
+                                        useOpenCV);
 
-    if (mCornersFound)
-    {
-        // draw chessboard corners
-        cv::drawChessboardCorners(mSketch, mBoardSize, mCorners, mCornersFound);
-    }
+  if (mCornersFound)
+  {
+    // draw chessboard corners
+    cv::drawChessboardCorners(mSketch, mBoardSize, mCorners, mCornersFound);
+  }
 }
 
-const std::vector<cv::Point2f>&
-Chessboard::getCorners(void) const
+const std::vector<cv::Point2f>& Chessboard::getCorners() const // 第一个const表示返回值不可修改，第二个const表示函数不可修改类的成员变量
 {
-    return mCorners;
+  return mCorners;
 }
 
-bool
-Chessboard::cornersFound(void) const
+bool Chessboard::cornersFound() const
 {
-    return mCornersFound;
+  return mCornersFound;
 }
 
-const cv::Mat&
-Chessboard::getImage(void) const
+const cv::Mat& Chessboard::getImage() const // 返回待检测棋盘格角点的灰度图像
 {
-    return mImage;
+  return mImage;
 }
 
-const cv::Mat&
-Chessboard::getSketch(void) const
+const cv::Mat& Chessboard::getSketch() const
 {
-    return mSketch;
+  return mSketch;
 }
 
-bool
-Chessboard::findChessboardCorners(const cv::Mat& image,
-                                  const cv::Size& patternSize,
-                                  std::vector<cv::Point2f>& corners,
-                                  int flags, bool useOpenCV)
+bool Chessboard::findChessboardCorners(const cv::Mat& image, const cv::Size& patternSize,
+                                       std::vector<cv::Point2f>& corners, int flags, bool useOpenCV)
 {
-    if (useOpenCV)
-    {
-        return cv::findChessboardCorners(image, patternSize, corners, flags);
-    }
-    else
-    {
-        return findChessboardCornersImproved(image, patternSize, corners, flags);
-    }
+  if (useOpenCV)
+  {
+    return cv::findChessboardCorners(image, patternSize, corners, flags);
+  }
+  else
+  {
+    return findChessboardCornersImproved(image, patternSize, corners, flags);
+  }
 }
 
-bool
-Chessboard::findChessboardCornersImproved(const cv::Mat& image,
-                                          const cv::Size& patternSize,
-                                          std::vector<cv::Point2f>& corners,
-                                          int flags)
+bool Chessboard::findChessboardCornersImproved(const cv::Mat& image, const cv::Size& patternSize,
+                                               std::vector<cv::Point2f>& corners, int flags)
 {
-    /************************************************************************************\
-        This is improved variant of chessboard corner detection algorithm that
-        uses a graph of connected quads. It is based on the code contributed
-        by Vladimir Vezhnevets and Philip Gruebele.
-        Here is the copyright notice from the original Vladimir's code:
-        ===============================================================
+  /************************************************************************************\
+      This is improved variant of chessboard corner detection algorithm that
+      uses a graph of connected quads. It is based on the code contributed
+      by Vladimir Vezhnevets and Philip Gruebele.
+      Here is the copyright notice from the original Vladimir's code:
+      ===============================================================
 
-        The algorithms developed and implemented by Vezhnevets Vldimir
-        aka Dead Moroz (vvp@graphics.cs.msu.ru)
-        See http://graphics.cs.msu.su/en/research/calibration/opencv.html
-        for detailed information.
+      The algorithms developed and implemented by Vezhnevets Vldimir
+      aka Dead Moroz (vvp@graphics.cs.msu.ru)
+      See http://graphics.cs.msu.su/en/research/calibration/opencv.html
+      for detailed information.
 
-        Reliability additions and modifications made by Philip Gruebele.
-        <a href="mailto:pgruebele@cox.net">pgruebele@cox.net</a>
+      Reliability additions and modifications made by Philip Gruebele.
+      <a href="mailto:pgruebele@cox.net">pgruebele@cox.net</a>
 
-        Some improvements were made by:
-        1) Martin Rufli - increased chance of correct corner matching
-           Rufli, M., Scaramuzza, D., and Siegwart, R. (2008),
-           Automatic Detection of Checkerboards on Blurred and Distorted Images,
-           Proceedings of the IEEE/RSJ International Conference on
-           Intelligent Robots and Systems (IROS 2008), Nice, France, September 2008.
-        2) Lionel Heng - post-detection checks and better thresholding
+      Some improvements were made by:
+      1) Martin Rufli - increased chance of correct corner matching
+         Rufli, M., Scaramuzza, D., and Siegwart, R. (2008),
+         Automatic Detection of Checkerboards on Blurred and Distorted Images,
+         Proceedings of the IEEE/RSJ International Conference on
+         Intelligent Robots and Systems (IROS 2008), Nice, France, September 2008.
+      2) Lionel Heng - post-detection checks and better thresholding
 
-    \************************************************************************************/
+  \************************************************************************************/
 
-    //int bestDilation        = -1;
-    const int minDilations    =  0;
-    const int maxDilations    =  7;
+  //int bestDilation        = -1;
+  const int minDilations    =  0; // 最小膨胀像素数
+  const int maxDilations    =  7;
 
-    std::vector<ChessboardQuadPtr> outputQuadGroup;
+  std::vector<ChessboardQuadPtr> outputQuadGroup;
 
-    if (image.depth() != CV_8U || image.channels() == 2)
+  if (image.depth() != CV_8U || image.channels() == 2) // depth表示底层数据的数据类型
+  {
+    return false;
+  }
+
+  if (patternSize.width < 2 || patternSize.height < 2)
+  {
+    return false;
+  }
+
+  if (patternSize.width > 127 || patternSize.height > 127)
+  {
+    return false;
+  }
+
+  cv::Mat img = image; // 传入的引用复制拷贝后是相互独立的，即修改img不会影响image
+
+  // Image histogram normalization and
+  // BGR to Grayscale image conversion (if applicable)
+  // MARTIN: Set to "false"
+  if (image.channels() != 1 || (flags & CV_CALIB_CB_NORMALIZE_IMAGE)) // 只要输入图像是彩色图或者有CV_CALIB_CB_NORMALIZE_IMAGE，就执行if
+  {
+    cv::Mat norm_img(image.rows, image.cols, CV_8UC1);
+
+    if (image.channels() != 1) // 如果输入图像是彩色图
     {
-        return false;
+      cv::cvtColor(image, norm_img, cv::COLOR_BGR2GRAY); // 将输入图像转换为灰度图
+      img = norm_img;
     }
 
-    if (patternSize.width < 2 || patternSize.height < 2)
+    if (flags & CV_CALIB_CB_NORMALIZE_IMAGE)
     {
-        return false;
+      cv::equalizeHist(image, norm_img);
+      img = norm_img;
     }
+  }
 
-    if (patternSize.width > 127 || patternSize.height > 127)
+  if (flags & CV_CALIB_CB_FAST_CHECK)
+  {
+    if (!checkChessboard(img, patternSize))
     {
-        return false;
+      return false;
     }
+  }
 
-    cv::Mat img = image;
+  // PART 1: FIND LARGEST PATTERN
+  //-----------------------------------------------------------------------
+  // Checker patterns are tried to be found by dilating the background and
+  // then applying a canny edge finder on the closed contours (checkers).
+  // Try one dilation run, but if the pattern is not found, repeat until
+  // max_dilations is reached.
 
-    // Image histogram normalization and
-    // BGR to Grayscale image conversion (if applicable)
-    // MARTIN: Set to "false"
-    if (image.channels() != 1 || (flags & CV_CALIB_CB_NORMALIZE_IMAGE))
-    {
-        cv::Mat norm_img(image.rows, image.cols, CV_8UC1);
+  int prevSqrSize = 0;
+  bool found = false;
+  std::vector<ChessboardCornerPtr> outputCorners;
 
-        if (image.channels() != 1)
-        {
-            cv::cvtColor(image, norm_img, CV_BGR2GRAY);
-            img = norm_img;
-        }
+  for (int k = 0; k < 6; ++k)
+  {
+      for (int dilations = minDilations; dilations <= maxDilations; ++dilations)
+      {
+          if (found)
+          {
+              break;
+          }
 
-        if (flags & CV_CALIB_CB_NORMALIZE_IMAGE)
-        {
-            cv::equalizeHist(image, norm_img);
-            img = norm_img;
-        }
-    }
+          cv::Mat thresh_img;
 
-    if (flags & CV_CALIB_CB_FAST_CHECK)
-    {
-        if (!checkChessboard(img, patternSize))
-        {
-            return false;
-        }
-    }
+          // convert the input grayscale image to binary (black-n-white)
+          if (flags & CV_CALIB_CB_ADAPTIVE_THRESH)
+          {
+              int blockSize = lround(prevSqrSize == 0 ?
+                  std::min(img.cols,img.rows)*(k%2 == 0 ? 0.2 : 0.1): prevSqrSize*2)|1;
 
-    // PART 1: FIND LARGEST PATTERN
-    //-----------------------------------------------------------------------
-    // Checker patterns are tried to be found by dilating the background and
-    // then applying a canny edge finder on the closed contours (checkers).
-    // Try one dilation run, but if the pattern is not found, repeat until
-    // max_dilations is reached.
+              // convert to binary
+              cv::adaptiveThreshold(img, thresh_img, 255, CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, blockSize, (k/2)*5);
+          }
+          else
+          {
+              // empiric threshold level
+              double mean = (cv::mean(img))[0];
+              int thresh_level = lround(mean - 10);
+              thresh_level = std::max(thresh_level, 10);
 
-    int prevSqrSize = 0;
-    bool found = false;
-    std::vector<ChessboardCornerPtr> outputCorners;
+              cv::threshold(img, thresh_img, thresh_level, 255, CV_THRESH_BINARY);
+          }
 
-    for (int k = 0; k < 6; ++k)
-    {
-        for (int dilations = minDilations; dilations <= maxDilations; ++dilations)
-        {
-            if (found)
-            {
-                break;
-            }
+          // MARTIN's Code
+          // Use both a rectangular and a cross kernel. In this way, a more
+          // homogeneous dilation is performed, which is crucial for small,
+          // distorted checkers. Use the CROSS kernel first, since its action
+          // on the image is more subtle
+          cv::Mat kernel1 = cv::getStructuringElement(CV_SHAPE_CROSS, cv::Size(3,3), cv::Point(1,1));
+          cv::Mat kernel2 = cv::getStructuringElement(CV_SHAPE_RECT, cv::Size(3,3), cv::Point(1,1));
 
-            cv::Mat thresh_img;
+          if (dilations >= 1)
+              cv::dilate(thresh_img, thresh_img, kernel1);
+          if (dilations >= 2)
+              cv::dilate(thresh_img, thresh_img, kernel2);
+          if (dilations >= 3)
+              cv::dilate(thresh_img, thresh_img, kernel1);
+          if (dilations >= 4)
+              cv::dilate(thresh_img, thresh_img, kernel2);
+          if (dilations >= 5)
+              cv::dilate(thresh_img, thresh_img, kernel1);
+          if (dilations >= 6)
+              cv::dilate(thresh_img, thresh_img, kernel2);
 
-            // convert the input grayscale image to binary (black-n-white)
-            if (flags & CV_CALIB_CB_ADAPTIVE_THRESH)
-            {
-                int blockSize = lround(prevSqrSize == 0 ?
-                    std::min(img.cols,img.rows)*(k%2 == 0 ? 0.2 : 0.1): prevSqrSize*2)|1;
+          // In order to find rectangles that go to the edge, we draw a white
+          // line around the image edge. Otherwise FindContours will miss those
+          // clipped rectangle contours. The border color will be the image mean,
+          // because otherwise we risk screwing up filters like cvSmooth()
+          cv::rectangle(thresh_img, cv::Point(0,0),
+                        cv::Point(thresh_img.cols - 1, thresh_img.rows - 1),
+                        CV_RGB(255,255,255), 3, 8);
 
-                // convert to binary
-                cv::adaptiveThreshold(img, thresh_img, 255, CV_ADAPTIVE_THRESH_MEAN_C, CV_THRESH_BINARY, blockSize, (k/2)*5);
-            }
-            else
-            {
-                // empiric threshold level
-                double mean = (cv::mean(img))[0];
-                int thresh_level = lround(mean - 10);
-                thresh_level = std::max(thresh_level, 10);
+          // Generate quadrangles in the following function
+          std::vector<ChessboardQuadPtr> quads;
 
-                cv::threshold(img, thresh_img, thresh_level, 255, CV_THRESH_BINARY);
-            }
+          generateQuads(quads, thresh_img, flags, dilations, true);
+          if (quads.empty())
+          {
+              continue;
+          }
 
-            // MARTIN's Code
-            // Use both a rectangular and a cross kernel. In this way, a more
-            // homogeneous dilation is performed, which is crucial for small,
-            // distorted checkers. Use the CROSS kernel first, since its action
-            // on the image is more subtle
-            cv::Mat kernel1 = cv::getStructuringElement(CV_SHAPE_CROSS, cv::Size(3,3), cv::Point(1,1));
-            cv::Mat kernel2 = cv::getStructuringElement(CV_SHAPE_RECT, cv::Size(3,3), cv::Point(1,1));
+          // The following function finds and assigns neighbor quads to every
+          // quadrangle in the immediate vicinity fulfilling certain
+          // prerequisites
+          findQuadNeighbors(quads, dilations);
 
-            if (dilations >= 1)
-                cv::dilate(thresh_img, thresh_img, kernel1);
-            if (dilations >= 2)
-                cv::dilate(thresh_img, thresh_img, kernel2);
-            if (dilations >= 3)
-                cv::dilate(thresh_img, thresh_img, kernel1);
-            if (dilations >= 4)
-                cv::dilate(thresh_img, thresh_img, kernel2);
-            if (dilations >= 5)
-                cv::dilate(thresh_img, thresh_img, kernel1);
-            if (dilations >= 6)
-                cv::dilate(thresh_img, thresh_img, kernel2);
+          // The connected quads will be organized in groups. The following loop
+          // increases a "group_idx" identifier.
+          // The function "findConnectedQuads assigns all connected quads
+          // a unique group ID.
+          // If more quadrangles were assigned to a given group (i.e. connected)
+          // than are expected by the input variable "patternSize", the
+          // function "cleanFoundConnectedQuads" erases the surplus
+          // quadrangles by minimizing the convex hull of the remaining pattern.
 
-            // In order to find rectangles that go to the edge, we draw a white
-            // line around the image edge. Otherwise FindContours will miss those
-            // clipped rectangle contours. The border color will be the image mean,
-            // because otherwise we risk screwing up filters like cvSmooth()
-            cv::rectangle(thresh_img, cv::Point(0,0),
-                          cv::Point(thresh_img.cols - 1, thresh_img.rows - 1),
-                          CV_RGB(255,255,255), 3, 8);
+          for (int group_idx = 0; ; ++group_idx)
+          {
+              std::vector<ChessboardQuadPtr> quadGroup;
 
-            // Generate quadrangles in the following function
-            std::vector<ChessboardQuadPtr> quads;
+              findConnectedQuads(quads, quadGroup, group_idx, dilations);
 
-            generateQuads(quads, thresh_img, flags, dilations, true);
-            if (quads.empty())
-            {
-                continue;
-            }
+              if (quadGroup.empty())
+              {
+                  break;
+              }
 
-            // The following function finds and assigns neighbor quads to every
-            // quadrangle in the immediate vicinity fulfilling certain
-            // prerequisites
-            findQuadNeighbors(quads, dilations);
+              cleanFoundConnectedQuads(quadGroup, patternSize);
 
-            // The connected quads will be organized in groups. The following loop
-            // increases a "group_idx" identifier.
-            // The function "findConnectedQuads assigns all connected quads
-            // a unique group ID.
-            // If more quadrangles were assigned to a given group (i.e. connected)
-            // than are expected by the input variable "patternSize", the
-            // function "cleanFoundConnectedQuads" erases the surplus
-            // quadrangles by minimizing the convex hull of the remaining pattern.
+              // The following function labels all corners of every quad
+              // with a row and column entry.
+              // "count" specifies the number of found quads in "quad_group"
+              // with group identifier "group_idx"
+              // The last parameter is set to "true", because this is the
+              // first function call and some initializations need to be
+              // made.
+              labelQuadGroup(quadGroup, patternSize, true);
 
-            for (int group_idx = 0; ; ++group_idx)
-            {
-                std::vector<ChessboardQuadPtr> quadGroup;
+              found = checkQuadGroup(quadGroup, outputCorners, patternSize);
 
-                findConnectedQuads(quads, quadGroup, group_idx, dilations);
+              float sumDist = 0;
+              int total = 0;
 
-                if (quadGroup.empty())
-                {
-                    break;
-                }
+              for (int i = 0; i < (int)outputCorners.size(); ++i)
+              {
+                  int ni = 0;
+                  float avgi = outputCorners.at(i)->meanDist(ni);
+                  sumDist += avgi * ni;
+                  total += ni;
+              }
+              prevSqrSize = lround(sumDist / std::max(total, 1));
 
-                cleanFoundConnectedQuads(quadGroup, patternSize);
+              if (found && !checkBoardMonotony(outputCorners, patternSize))
+              {
+                  found = false;
+              }
+          }
+      }
+  }
 
-                // The following function labels all corners of every quad
-                // with a row and column entry.
-                // "count" specifies the number of found quads in "quad_group"
-                // with group identifier "group_idx"
-                // The last parameter is set to "true", because this is the
-                // first function call and some initializations need to be
-                // made.
-                labelQuadGroup(quadGroup, patternSize, true);
+  if (!found)
+  {
+      return false;
+  }
+  else
+  {
+      corners.clear();
+      corners.reserve(outputCorners.size());
+      for (size_t i = 0; i < outputCorners.size(); ++i)
+      {
+          corners.push_back(outputCorners.at(i)->pt);
+      }
 
-                found = checkQuadGroup(quadGroup, outputCorners, patternSize);
+      cv::cornerSubPix(image, corners, cv::Size(11, 11), cv::Size(-1,-1),
+                       cv::TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 30, 0.1));
 
-                float sumDist = 0;
-                int total = 0;
-
-                for (int i = 0; i < (int)outputCorners.size(); ++i)
-                {
-                    int ni = 0;
-                    float avgi = outputCorners.at(i)->meanDist(ni);
-                    sumDist += avgi * ni;
-                    total += ni;
-                }
-                prevSqrSize = lround(sumDist / std::max(total, 1));
-
-                if (found && !checkBoardMonotony(outputCorners, patternSize))
-                {
-                    found = false;
-                }
-            }
-        }
-    }
-
-    if (!found)
-    {
-        return false;
-    }
-    else
-    {
-        corners.clear();
-        corners.reserve(outputCorners.size());
-        for (size_t i = 0; i < outputCorners.size(); ++i)
-        {
-            corners.push_back(outputCorners.at(i)->pt);
-        }
-
-        cv::cornerSubPix(image, corners, cv::Size(11, 11), cv::Size(-1,-1),
-                         cv::TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 30, 0.1));
-
-        return true;
-    }
+      return true;
+  }
 }
 
 //===========================================================================
@@ -1563,79 +1554,78 @@ void countClasses(const std::vector<std::pair<float, int> >& pairs, size_t idx1,
     }
 }
 
-bool
-Chessboard::checkChessboard(const cv::Mat& image, cv::Size patternSize) const
+bool Chessboard::checkChessboard(const cv::Mat& image, const cv::Size& patternSize) const
 {
-    const int erosionCount = 1;
-    const float blackLevel = 20.f;
-    const float whiteLevel = 130.f;
-    const float blackWhiteGap = 70.f;
+  const int erosionCount = 1;
+  const float blackLevel = 20.f;
+  const float whiteLevel = 130.f;
+  const float blackWhiteGap = 70.f;
 
-    cv::Mat white = image.clone();
+  cv::Mat white = image.clone();
 
-    cv::Mat black = image.clone();
+  cv::Mat black = image.clone();
+  // kernel膨胀核（取cv::Mat()时是一个3x3的矩形核），anchor锚点（从这个参数开始参数都有默认值，cv::Point(-1,-1)表示锚点在元素的中心位置），iterations腐蚀迭代次数
+  cv::erode(white, white, cv::Mat(), cv::Point(-1,-1), erosionCount);
+  cv::dilate(black, black, cv::Mat(), cv::Point(-1,-1), erosionCount);
 
-    cv::erode(white, white, cv::Mat(), cv::Point(-1,-1), erosionCount);
-    cv::dilate(black, black, cv::Mat(), cv::Point(-1,-1), erosionCount);
+  cv::Mat thresh(image.rows, image.cols, CV_8UC1);
 
-    cv::Mat thresh(image.rows, image.cols, CV_8UC1);
+  bool result = false;
+  for (float threshLevel = blackLevel; threshLevel < whiteLevel && !result; threshLevel += 20.0f)
+  {
+      cv::threshold(white, thresh, threshLevel + blackWhiteGap, 255, CV_THRESH_BINARY);
 
-    bool result = false;
-    for (float threshLevel = blackLevel; threshLevel < whiteLevel && !result; threshLevel += 20.0f)
-    {
-        cv::threshold(white, thresh, threshLevel + blackWhiteGap, 255, CV_THRESH_BINARY);
+      std::vector< std::vector<cv::Point> > contours;
+      std::vector<cv::Vec4i> hierarchy;
 
-        std::vector< std::vector<cv::Point> > contours;
-        std::vector<cv::Vec4i> hierarchy;
+      // Initialize contour retrieving routine
+      cv::findContours(thresh, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE);
 
-        // Initialize contour retrieving routine
-        cv::findContours(thresh, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE);
+      std::vector<std::pair<float, int> > quads;
+      getQuadrangleHypotheses(contours, quads, 1);
 
-        std::vector<std::pair<float, int> > quads;
-        getQuadrangleHypotheses(contours, quads, 1);
+      cv::threshold(black, thresh, threshLevel, 255, CV_THRESH_BINARY_INV);
 
-        cv::threshold(black, thresh, threshLevel, 255, CV_THRESH_BINARY_INV);
+      cv::findContours(thresh, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE);
+      getQuadrangleHypotheses(contours, quads, 0);
 
-        cv::findContours(thresh, contours, hierarchy, CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE);
-        getQuadrangleHypotheses(contours, quads, 0);
+      const size_t min_quads_count = patternSize.width * patternSize.height / 2;
+      std::sort(quads.begin(), quads.end(), less_pred);
 
-        const size_t min_quads_count = patternSize.width * patternSize.height / 2;
-        std::sort(quads.begin(), quads.end(), less_pred);
+      // now check if there are many hypotheses with similar sizes
+      // do this by floodfill-style algorithm
+      const float sizeRelDev = 0.4f;
 
-        // now check if there are many hypotheses with similar sizes
-        // do this by floodfill-style algorithm
-        const float sizeRelDev = 0.4f;
+      for (size_t i = 0; i < quads.size(); ++i)
+      {
+          size_t j = i + 1;
+          for (; j < quads.size(); ++j)
+          {
+              if (quads[j].first / quads[i].first > 1.0f + sizeRelDev)
+              {
+                  break;
+              }
+          }
 
-        for (size_t i = 0; i < quads.size(); ++i)
-        {
-            size_t j = i + 1;
-            for (; j < quads.size(); ++j)
-            {
-                if (quads[j].first / quads[i].first > 1.0f + sizeRelDev)
-                {
-                    break;
-                }
-            }
+          if (j + 1 > min_quads_count + i)
+          {
+              // check the number of black and white squares
+              std::vector<int> counts;
+              countClasses(quads, i, j, counts);
+              const int blackCount = lroundf(ceilf(patternSize.width / 2.0f) * ceilf(patternSize.height / 2.0f));
+              const int whiteCount = lroundf(floorf(patternSize.width / 2.0f) * floorf(patternSize.height / 2.0f));
+              if (counts[0] < blackCount * 0.75f ||
+                  counts[1] < whiteCount * 0.75f)
+              {
+                  continue;
+              }
+              result = true;
+              break;
+          }
+      }
+  }
 
-            if (j + 1 > min_quads_count + i)
-            {
-                // check the number of black and white squares
-                std::vector<int> counts;
-                countClasses(quads, i, j, counts);
-                const int blackCount = lroundf(ceilf(patternSize.width / 2.0f) * ceilf(patternSize.height / 2.0f));
-                const int whiteCount = lroundf(floorf(patternSize.width / 2.0f) * floorf(patternSize.height / 2.0f));
-                if (counts[0] < blackCount * 0.75f ||
-                    counts[1] < whiteCount * 0.75f)
-                {
-                    continue;
-                }
-                result = true;
-                break;
-            }
-        }
-    }
-
-    return result;
+  return result;
 }
 
 bool

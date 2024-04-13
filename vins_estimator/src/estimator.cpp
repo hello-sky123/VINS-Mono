@@ -103,7 +103,7 @@ void Estimator::processIMU(double dt, const Vector3d& linear_acceleration, const
   {
     pre_integrations[frame_count]->push_back(dt, linear_acceleration, angular_velocity);
     //if(solver_flag != NON_LINEAR)
-    tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity); // 用于初始化
+    tmp_pre_integration->push_back(dt, linear_acceleration, angular_velocity); // 用于初始化，同时将imu数据保存到预积分类中
 
     // 保存数据
     dt_buf[frame_count].push_back(dt); // 保存这一帧图像与上一帧图像之间的imu数据
@@ -252,22 +252,23 @@ bool Estimator::initialStructure()
     for (frame_it = all_image_frame.begin(), frame_it++; frame_it != all_image_frame.end(); frame_it++)
     {
       double dt = frame_it->second.pre_integration->sum_dt;
-      Vector3d tmp_g = frame_it->second.pre_integration->delta_v / dt;
+      Vector3d tmp_g = frame_it->second.pre_integration->delta_v / dt; // 两个图像帧之间的平均速度
       sum_g += tmp_g;
     }
     Vector3d aver_g;
-    aver_g = sum_g * 1.0 / ((int)all_image_frame.size() - 1);
+    aver_g = sum_g * 1.0 / ((int)all_image_frame.size() - 1); // 滑窗内所有帧的平均加速度
+
+    // 计算运动速度的方差
     double var = 0;
     for (frame_it = all_image_frame.begin(), frame_it++; frame_it != all_image_frame.end(); frame_it++)
     {
       double dt = frame_it->second.pre_integration->sum_dt;
       Vector3d tmp_g = frame_it->second.pre_integration->delta_v / dt;
       var += (tmp_g - aver_g).transpose() * (tmp_g - aver_g);
-      //cout << "frame g " << tmp_g.transpose() << endl;
     }
     var = sqrt(var / ((int)all_image_frame.size() - 1));
-    //ROS_WARN("IMU variation %f!", var);
-    if(var < 0.25)
+
+    if (var < 0.25)
     {
       ROS_INFO("IMU excitation not enough!");
       return false;
@@ -280,20 +281,22 @@ bool Estimator::initialStructure()
   Vector3d T[frame_count + 1];
   map<int, Vector3d> sfm_tracked_points;
   vector<SFMFeature> sfm_f; // 保存所有的特征点的信息
+
   for (auto& it_per_id: f_manager.feature)
   {
     int imu_j = it_per_id.start_frame - 1; // 观测到该特征点的第一帧
-    SFMFeature tmp_feature; // 用来做后续的sfm
+    SFMFeature tmp_feature; // 用来做后续的sfm，保存了特征点所在的帧号和归一化坐标
     tmp_feature.state = false;
     tmp_feature.id = it_per_id.feature_id;
-    for (auto& it_per_frame: it_per_id.feature_per_frame)
+    for (auto& it_per_frame: it_per_id.feature_per_frame) // 该特征点在每一帧的观测
     {
       imu_j++;
-      Vector3d pts_j = it_per_frame.point;
+      Vector3d pts_j = it_per_frame.point; // 归一化平面坐标
       tmp_feature.observation.emplace_back(imu_j, Eigen::Vector2d{pts_j.x(), pts_j.y()});
     }
-    sfm_f.push_back(tmp_feature);
+    sfm_f.push_back(tmp_feature); // sfm_f每一个元素是一个特征点的信息
   }
+
   Matrix3d relative_R;
   Vector3d relative_T;
   int l;
@@ -303,9 +306,10 @@ bool Estimator::initialStructure()
     ROS_INFO("Not enough features or parallax; Move device around");
     return false;
   }
+
   GlobalSFM sfm;
   if (!sfm.construct(frame_count + 1, Q, T, l,
-                      relative_R, relative_T,
+                     relative_R, relative_T,
                      sfm_f, sfm_tracked_points))
   {
     ROS_DEBUG("global SFM failed!");
@@ -494,6 +498,7 @@ bool Estimator::relativePose(Matrix3d& relative_R, Vector3d& relative_T, int& l)
   {
     vector<pair<Vector3d, Vector3d>> corres;
     corres = f_manager.getCorresponding(i, WINDOW_SIZE);
+
     // 要求共视的特征点数目大于20个（论文中写的是30）
     if (corres.size() > 20)
     {
@@ -507,14 +512,17 @@ bool Estimator::relativePose(Matrix3d& relative_R, Vector3d& relative_T, int& l)
         sum_parallax += parallax;
       }
       average_parallax = 1.0 * sum_parallax / int(corres.size());
+
+      // 如果i帧与滑窗内最后一帧的平均视差大于30个像素，同时求解得到相对位姿满足条件
       if(average_parallax * 460 > 30 && MotionEstimator::solveRelativeRT(corres, relative_R, relative_T))
       {
-        l = i;
+        l = i; // 将第i帧设置为枢纽帧
         ROS_DEBUG("average_parallax %f choose l %d and newest frame to triangulate the whole structure", average_parallax * 460, l);
         return true;
       }
     }
   }
+
   return false;
 }
 

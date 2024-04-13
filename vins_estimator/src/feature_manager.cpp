@@ -2,11 +2,11 @@
 
 int FeaturePerId::endFrame()
 {
-    return start_frame + feature_per_frame.size() - 1;
+  return start_frame + feature_per_frame.size() - 1;
 }
 
 FeatureManager::FeatureManager(Matrix3d _Rs[])
-    : Rs(_Rs)
+  : Rs(_Rs)
 {
   for (int i = 0; i < NUM_OF_CAM; i++)
     ric[i].setIdentity();
@@ -124,7 +124,7 @@ void FeatureManager::debugShow()
 }
 
 /**
- * @brief 得到同时被相邻两帧观测到的特征点的归一化坐标
+ * @brief 得到同时被给定两帧观测到的特征点的归一化坐标
  * @param[in] frame_count_l
  * @param[in] frame_count_r
  * @return vector<pair<Vector3d, Vector3d>>
@@ -134,7 +134,7 @@ vector<pair<Vector3d, Vector3d>> FeatureManager::getCorresponding(int frame_coun
   vector<pair<Vector3d, Vector3d>> corres;
   for (auto& it: feature)
   {
-    // 判断该特征点是否同时被相邻两帧观测到
+    // 判断该特征点是否同时被给定两帧观测到
     if (it.start_frame <= frame_count_l && it.endFrame() >= frame_count_r)
     {
       Vector3d a = Vector3d::Zero(), b = Vector3d::Zero();

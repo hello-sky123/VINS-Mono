@@ -16,17 +16,16 @@ void solveGyroscopeBias(map<double, ImageFrame>& all_image_frame, Vector3d* Bgs)
   map<double, ImageFrame>::iterator frame_j;
   for (frame_i = all_image_frame.begin(); next(frame_i) != all_image_frame.end(); frame_i++)
   {
-    frame_j = next(frame_i);
+    frame_j = next(frame_i); // 下一帧，不一定是KF
     MatrixXd tmp_A(3, 3);
     tmp_A.setZero();
     VectorXd tmp_b(3);
-    tmp_b.setZero();                       // 相邻两帧之间的旋转矩阵
-    Eigen::Quaterniond q_ij(frame_i->second.R.transpose() * frame_j->second.R); // 视觉得到的相邻两帧之间的旋转
+    tmp_b.setZero();                       
+    Eigen::Quaterniond q_ij(frame_i->second.R.transpose() * frame_j->second.R); // 视觉得到的相邻两帧之间的旋转i->j
     tmp_A = frame_j->second.pre_integration->jacobian.template block<3, 3>(O_R, O_BG); // imu得到的角度误差关于陀螺仪零偏的雅克比
     tmp_b = 2 * (frame_j->second.pre_integration->delta_q.inverse() * q_ij).vec(); // .vec()是四元数的虚部
     A += tmp_A.transpose() * tmp_A;
     b += tmp_A.transpose() * tmp_b;
-
   }
   delta_bg = A.ldlt().solve(b); // 对称正定矩阵的Cholesky分解
   ROS_WARN_STREAM("gyroscope bias initial calibration " << delta_bg.transpose());
@@ -49,7 +48,7 @@ MatrixXd TangentBasis(Vector3d& g0) // g0是重力向量的初始值（方向是
   Vector3d b, c;
   Vector3d a = g0.normalized();
   Vector3d tmp(0, 0, 1);
-  if(a == tmp)
+  if (a == tmp)
     tmp << 1, 0, 0;
   b = (tmp - a * (a.transpose() * tmp)).normalized(); // 得到与a垂直的单位向量
   c = a.cross(b); // a x b
@@ -125,12 +124,12 @@ void RefineGravity(map<double, ImageFrame>& all_image_frame, Vector3d& g, Vector
       A.block<6, 3>(i * 3, n_state - 3) += r_A.topRightCorner<6, 3>();
       A.block<3, 6>(n_state - 3, i * 3) += r_A.bottomLeftCorner<3, 6>();
     }
+
     A = A * 1000.0;
     b = b * 1000.0;
     x = A.ldlt().solve(b);
     VectorXd dg = x.segment<2>(n_state - 3);
     g0 = (g0 + lxly * dg).normalized() * G.norm();
-    //double s = x(n_state - 1);
   }
   g = g0;
 }
@@ -170,12 +169,11 @@ bool LinearAlignment(map<double, ImageFrame>& all_image_frame, Vector3d& g, Vect
     tmp_A.block<3, 3>(0, 6) = 0.5 * frame_i->second.R.transpose() * dt * dt;
     tmp_A.block<3, 1>(0, 9) = frame_i->second.R.transpose() * (frame_j->second.T - frame_i->second.T) / 100.0;
     tmp_b.block<3, 1>(0, 0) = frame_j->second.pre_integration->delta_p + frame_i->second.R.transpose() * frame_j->second.R * TIC[0] - TIC[0];
-    //cout << "delta_p   " << frame_j->second.pre_integration->delta_p.transpose() << endl;
+    
     tmp_A.block<3, 3>(3, 0) = -Matrix3d::Identity();
     tmp_A.block<3, 3>(3, 3) = frame_i->second.R.transpose() * frame_j->second.R;
     tmp_A.block<3, 3>(3, 6) = frame_i->second.R.transpose() * dt;
     tmp_b.block<3, 1>(3, 0) = frame_j->second.pre_integration->delta_v;
-    //cout << "delta_v   " << frame_j->second.pre_integration->delta_v.transpose() << endl;
 
     Matrix<double, 6, 6> cov_inv = Matrix<double, 6, 6>::Zero(); // 协方差矩阵的逆，也就是信息矩阵（各个量的权重）
     //cov.block<6, 6>(0, 0) = IMU_cov[i + 1];
@@ -198,12 +196,12 @@ bool LinearAlignment(map<double, ImageFrame>& all_image_frame, Vector3d& g, Vect
   // 增强数值稳定性
   A = A * 1000.0;
   b = b * 1000.0;
-  x = A.ldlt().solve(b);
+  x = A.ldlt().solve(b); // 对称正定矩阵的Cholesky分解
   double s = x(n_state - 1) / 100.0;
   ROS_DEBUG("estimated scale: %f", s);
   g = x.segment<3>(n_state - 4);
   ROS_DEBUG_STREAM(" result g     " << g.norm() << " " << g.transpose());
-  if(fabs(g.norm() - G.norm()) > 1.0 || s < 0)
+  if (fabs(g.norm() - G.norm()) > 1.0 || s < 0)
   {
     return false;
   }
@@ -224,7 +222,7 @@ bool VisualIMUAlignment(map<double, ImageFrame>& all_image_frame, Vector3d* Bgs,
 {
   solveGyroscopeBias(all_image_frame, Bgs);
 
-  if(LinearAlignment(all_image_frame, g, x))
+  if (LinearAlignment(all_image_frame, g, x))
     return true;
   else
     return false;

@@ -199,7 +199,7 @@ class IntegrationBase
    Eigen::Vector3d acc_0, gyr_0; // 第一帧imu数据的加速度计和陀螺仪数据
    Eigen::Vector3d acc_1, gyr_1; // 第二帧imu数据的加速度计和陀螺仪数据
 
-   const Eigen::Vector3d linearized_acc, linearized_gyr;
+   const Eigen::Vector3d linearized_acc, linearized_gyr; // 保存预积分第一帧imu数据的加速度计和陀螺仪数据
    Eigen::Vector3d linearized_ba, linearized_bg; // 优化变量，加速度计和陀螺仪的bias
 
    Eigen::Matrix<double, 15, 15> jacobian, covariance; // 预积分的雅克比矩阵和协方差矩阵

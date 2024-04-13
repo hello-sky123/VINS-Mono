@@ -255,14 +255,13 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
     }
   }
 
-  //full BA
+  // full BA
   // step5: 进行全局BA，优化所有关键帧的位姿以及所有特征点的三维坐标
   ceres::Problem problem; // 创建一个优化问题
   ceres::LocalParameterization* local_parameterization = new ceres::QuaternionParameterization(); // 局部参数的更新方式
-  //cout << " begin full BA " << endl;
   for (int i = 0; i < frame_num; i++)
   {
-    //double array for ceres
+    // double array for ceres
     // 待优化的参数块以double数组的形式存储
     c_translation[i][0] = c_Translation[i].x();
     c_translation[i][1] = c_Translation[i].y();
@@ -277,11 +276,11 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
     // fix设置的是世界坐标系第l帧的位姿，同时fix最后一帧的位移用来fix尺度
     if (i == l)
     {
-      problem.SetParameterBlockConstant(c_rotation[i]);
+      problem.SetParameterBlockConstant(c_rotation[i]); // 固定枢纽帧的旋转
     }
     if (i == l || i == frame_num - 1)
     {
-      problem.SetParameterBlockConstant(c_translation[i]);
+      problem.SetParameterBlockConstant(c_translation[i]); // 固定枢纽帧和最后一帧的平移
     }
   }
 
@@ -299,13 +298,13 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
     }
 
   }
+
   ceres::Solver::Options options; // 配置求解器的选项
-  options.linear_solver_type = ceres::DENSE_SCHUR;
-  //options.minimizer_progress_to_stdout = true;
+  options.linear_solver_type = ceres::DENSE_SCHUR; // 稠密矩阵求解器
   options.max_solver_time_in_seconds = 0.2;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
-  //std::cout << summary.BriefReport() << "\n";
+
   if (summary.termination_type == ceres::CONVERGENCE || summary.final_cost < 5e-03)
   {
     cout << "vision only BA converge" << endl;
@@ -324,13 +323,11 @@ bool GlobalSFM::construct(int frame_num, Quaterniond* q, Vector3d* T, int l,
     q[i].y() = c_rotation[i][2];
     q[i].z() = c_rotation[i][3];
     q[i] = q[i].inverse();
-      //cout << "final  q" << " i " << i <<"  " <<q[i].w() << "  " << q[i].vec().transpose() << endl;
   }
   for (int i = 0; i < frame_num; i++)
   {
 
     T[i] = -1 * (q[i] * Vector3d(c_translation[i][0], c_translation[i][1], c_translation[i][2]));
-    //cout << "final  t" << " i " << i <<"  " << T[i](0) <<"  "<< T[i](1) <<"  "<< T[i](2) << endl;
   }
   for (auto& i: sfm_f)
   {

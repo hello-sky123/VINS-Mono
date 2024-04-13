@@ -19,12 +19,12 @@ class ImageFrame
    {
      points = _points;
    };
-   map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> points;
-   double t;
-   Matrix3d R;
+   map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> points; // 特征点的id，观测信息
+   double t; // 这一帧的时间戳
+   Matrix3d R; // 这一帧的位姿
    Vector3d T;
    IntegrationBase* pre_integration;
-   bool is_key_frame;
+   bool is_key_frame; // 是否是关键帧
 };
 
 bool VisualIMUAlignment(map<double, ImageFrame>& all_image_frame, Vector3d* Bgs, Vector3d& g, VectorXd& x);

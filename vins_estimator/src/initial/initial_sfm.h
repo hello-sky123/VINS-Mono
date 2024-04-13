@@ -44,9 +44,9 @@ struct ReprojectionError3D
   }
 
   static ceres::CostFunction* Create(const double observed_x, const double observed_y)
-  {                                   // 第一个模板参数是计算残差的类，后面依次为残差的维度，待优化变量的维度
+  {         // 第一个模板参数是计算残差的类，后面依次为残差的维度，待优化变量的维度
     return (new ceres::AutoDiffCostFunction<ReprojectionError3D, 2, 4, 3, 3>(
-           new ReprojectionError3D(observed_x,observed_y)));
+                new ReprojectionError3D(observed_x,observed_y)));
   }
 
   double observed_u;

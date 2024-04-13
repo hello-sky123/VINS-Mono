@@ -182,6 +182,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
         result = initialStructure();
         initial_timestamp = header.stamp.toSec();
       }
+      // step3: 初始化成功，开始非线性优化
       if (result)
       {
         solver_flag = NON_LINEAR;
@@ -279,7 +280,7 @@ bool Estimator::initialStructure()
   // 做一个纯视觉的slam
   Quaterniond Q[frame_count + 1];
   Vector3d T[frame_count + 1];
-  map<int, Vector3d> sfm_tracked_points;
+  map<int, Vector3d> sfm_tracked_points; // 保存优化后的特征点的3D坐标
   vector<SFMFeature> sfm_f; // 保存所有的特征点的信息
 
   for (auto& it_per_id: f_manager.feature)
@@ -321,7 +322,7 @@ bool Estimator::initialStructure()
   // step2只是针对KF做了sfm，初始化需要all_image_frame中的所有帧，因此下面通过KF来求解其他的非KF的帧的位姿
   map<double, ImageFrame>::iterator frame_it;
   map<int, Vector3d>::iterator it;
-  frame_it = all_image_frame.begin( );
+  frame_it = all_image_frame.begin();
   for (int i = 0; frame_it != all_image_frame.end( ); frame_it++)
   {
     // provide initial guess
@@ -334,14 +335,14 @@ bool Estimator::initialStructure()
       i++;
       continue;
     }
-    if((frame_it->first) > Headers[i].stamp.toSec())
+    if ((frame_it->first) > Headers[i].stamp.toSec()) // 偏移i，找到最接近的KF
     {
       i++;
     }
 
     // 最近的KF提供初始值，Twc->Tcw
     Matrix3d R_inital = (Q[i].inverse()).toRotationMatrix();
-    Vector3d P_inital = - R_inital * T[i];
+    Vector3d P_inital = -R_inital * T[i];
     cv::eigen2cv(R_inital, tmp_r);
     cv::Rodrigues(tmp_r, rvec);
     cv::eigen2cv(P_inital, t);
@@ -366,6 +367,7 @@ bool Estimator::initialStructure()
         }
       }
     }
+
     cv::Mat K = (cv::Mat_<double>(3, 3) << 1, 0, 0, 0, 1, 0, 0, 0, 1);
     if (pts_3_vector.size() < 6)
     {
@@ -406,9 +408,10 @@ bool Estimator::visualInitialAlign()
 {
   TicToc t_g;
   VectorXd x;
-  //solve scale
+
+  // solve scale
   bool result = VisualIMUAlignment(all_image_frame, Bgs, g, x);
-  if(!result)
+  if (!result)
   {
     ROS_DEBUG("solve g failed!");
     return false;
@@ -430,11 +433,11 @@ bool Estimator::visualInitialAlign()
     dep[i] = -1;
   f_manager.clearDepth(dep);
 
-  //triangulation on cam pose , no tic
+  // triangulation on cam pose , no tic
   Vector3d TIC_TMP[NUM_OF_CAM];
   for(auto& i: TIC_TMP)
     i.setZero();
-  ric[0] = RIC[0];
+  ric[0] = RIC[0]; // imu到相机的旋转
   f_manager.setRic(ric);
   // 多约束三角化所有特征点，仍是带有尺度模糊
   f_manager.triangulate(Ps, &(TIC_TMP[0]), &(RIC[0]));
@@ -448,7 +451,7 @@ bool Estimator::visualInitialAlign()
   // 下面把所有状态量对齐到第0帧的imu坐标系
   for (int i = frame_count; i >= 0; i--) // Rs是枢纽帧->imu
     // twi - tw0 = t0i（枢纽帧坐标系），把所有的平移对齐到滑窗的第0帧，Ps还是在枢纽帧坐标系下
-    Ps[i] = s * Ps[i] - Rs[i] * TIC[0] - (s * Ps[0] - Rs[0] * TIC[0]);
+    Ps[i] = s * Ps[i] - Rs[i] * TIC[0] - (s * Ps[0] - Rs[0] * TIC[0]); // 相当于把世界系的原点移到了第0帧的imu坐标系的原点
 
   //将求解出来的速度赋值给滑窗内的状态量
   int kv = -1;
@@ -475,9 +478,10 @@ bool Estimator::visualInitialAlign()
   // 所有的P V Q全部对齐到第0帧，同时将第0帧与重力方向对齐
   Matrix3d R0 = Utility::g2R(g); // g是枢纽帧坐标系下的重力，得到Rw_sn
   double yaw = Utility::R2ypr(R0 * Rs[0]).x(); // 第0帧的yaw角（相对于真正的world系）
-  R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
+  R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0; // 得到的R0是对齐到重力方向下的，同时yaw角对齐到第0帧
   g = R0 * g;
-  //Matrix3d rot_diff = R0 * Rs[0].transpose();
+
+  // Matrix3d rot_diff = R0 * Rs[0].transpose();
   Matrix3d rot_diff = R0;
   for (int i = 0; i <= frame_count; i++)
   {

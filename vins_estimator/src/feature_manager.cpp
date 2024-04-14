@@ -264,7 +264,6 @@ void FeatureManager::triangulate(Vector3d Ps[], Vector3d tic[], Matrix3d ric[])
 
     // 得到的深度实际上是第一个观测到该特征点的KF的相机坐标系下的深度
     it_per_id.estimated_depth = svd_method;
-    //it_per_id->estimated_depth = INIT_DEPTH;
 
     if (it_per_id.estimated_depth < 0.1)
     {

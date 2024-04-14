@@ -41,8 +41,8 @@ struct ThreadsStruct
   std::vector<ResidualBlockInfo*> sub_factors;
   Eigen::MatrixXd A;
   Eigen::VectorXd b;
-  std::unordered_map<long, int> parameter_block_size; //global size
-  std::unordered_map<long, int> parameter_block_idx; //local size
+  std::unordered_map<long, int> parameter_block_size; // global size
+  std::unordered_map<long, int> parameter_block_idx; // local size
 };
 
 class MarginalizationInfo
@@ -63,12 +63,12 @@ class MarginalizationInfo
    std::unordered_map<long, int> parameter_block_idx; //local size // 地址->参数排列的顺序idx
    std::unordered_map<long, double*> parameter_block_data; // 地址->参数块实际内容的地址
 
-   std::vector<int> keep_block_size; //global size
-   std::vector<int> keep_block_idx;  //local size
+   std::vector<int> keep_block_size; // global size
+   std::vector<int> keep_block_idx;  // local size
    std::vector<double*> keep_block_data;
 
-   Eigen::MatrixXd linearized_jacobians;
-   Eigen::VectorXd linearized_residuals;
+   Eigen::MatrixXd linearized_jacobians; // 边缘化以后形成的新的雅可比矩阵
+   Eigen::VectorXd linearized_residuals; // 边缘化以后形成的新的残差
    const double eps = 1e-8;
 
 };

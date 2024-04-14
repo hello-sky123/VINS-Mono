@@ -597,7 +597,7 @@ void Estimator::vector2double()
  */
 void Estimator::double2vector()
 {
-  // 取出优化前的第i帧的位姿
+  // 取出优化前的第0帧的位姿
   Vector3d origin_R0 = Utility::R2ypr(Rs[0]);
   Vector3d origin_P0 = Ps[0];
 
@@ -609,7 +609,7 @@ void Estimator::double2vector()
   }
   // 取出优化后的第i帧的位姿
   Vector3d origin_R00 = Utility::R2ypr(Quaterniond(para_Pose[0][6], para_Pose[0][3],
-                                                      para_Pose[0][4],para_Pose[0][5]).toRotationMatrix());
+                                                   para_Pose[0][4],para_Pose[0][5]).toRotationMatrix());
   double y_diff = origin_R0.x() - origin_R00.x();
   //TODO
   Matrix3d rot_diff = Utility::ypr2R(Vector3d(y_diff, 0, 0));
@@ -629,17 +629,17 @@ void Estimator::double2vector()
     Ps[i] = rot_diff * Vector3d(para_Pose[i][0] - para_Pose[0][0],para_Pose[i][1] - para_Pose[0][1],
                                 para_Pose[i][2] - para_Pose[0][2]) + origin_P0;
 
-    Vs[i] = rot_diff * Vector3d(para_SpeedBias[i][0],para_SpeedBias[i][1],para_SpeedBias[i][2]);
+    Vs[i] = rot_diff * Vector3d(para_SpeedBias[i][0], para_SpeedBias[i][1], para_SpeedBias[i][2]);
 
-    Bas[i] = Vector3d(para_SpeedBias[i][3],para_SpeedBias[i][4],para_SpeedBias[i][5]);
+    Bas[i] = Vector3d(para_SpeedBias[i][3], para_SpeedBias[i][4], para_SpeedBias[i][5]);
 
-    Bgs[i] = Vector3d(para_SpeedBias[i][6],para_SpeedBias[i][7],para_SpeedBias[i][8]);
+    Bgs[i] = Vector3d(para_SpeedBias[i][6], para_SpeedBias[i][7], para_SpeedBias[i][8]);
   }
 
   for (int i = 0; i < NUM_OF_CAM; i++)
   {
-    tic[i] = Vector3d(para_Ex_Pose[i][0],para_Ex_Pose[i][1],para_Ex_Pose[i][2]);
-    ric[i] = Quaterniond(para_Ex_Pose[i][6],para_Ex_Pose[i][3],para_Ex_Pose[i][4],para_Ex_Pose[i][5]).toRotationMatrix();
+    tic[i] = Vector3d(para_Ex_Pose[i][0], para_Ex_Pose[i][1], para_Ex_Pose[i][2]);
+    ric[i] = Quaterniond(para_Ex_Pose[i][6], para_Ex_Pose[i][3], para_Ex_Pose[i][4], para_Ex_Pose[i][5]).toRotationMatrix();
   }
 
   VectorXd dep = f_manager.getDepthVector();
@@ -665,9 +665,6 @@ void Estimator::double2vector()
     relo_relative_t = relo_r.transpose() * (Ps[relo_frame_local_index] - relo_t);
     relo_relative_q = relo_r.transpose() * Rs[relo_frame_local_index];
     relo_relative_yaw = Utility::normalizeAngle(Utility::R2ypr(Rs[relo_frame_local_index]).x() - Utility::R2ypr(relo_r).x());
-    //cout << "vins relo " << endl;
-    //cout << "vins relative_t " << relo_relative_t.transpose() << endl;
-    //cout << "vins relative_yaw " <<relo_relative_yaw << endl;
     relocalization_info = false;
   }
 }
@@ -879,7 +876,6 @@ void Estimator::optimization()
   TicToc t_solver;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
-  //cout << summary.BriefReport() << endl;
   ROS_DEBUG("Iterations : %d", static_cast<int>(summary.iterations.size()));
   ROS_DEBUG("solver costs: %f", t_solver.toc());
 
@@ -919,10 +915,11 @@ void Estimator::optimization()
     {
       if (pre_integrations[1]->sum_dt < 10.0)
       {
-        auto* imu_factor = new IMUFactor(pre_integrations[1]);
-        auto *residual_block_info = new ResidualBlockInfo(imu_factor, nullptr,vector<double *>{para_Pose[0],
-                                                           para_SpeedBias[0], para_Pose[1], para_SpeedBias[1]},vector<int>{0, 1});
-        marginalization_info->addResidualBlockInfo(residual_block_info);                                 // 这里就是第0和1个参数块是需要被边缘化的
+        auto* imu_factor = new IMUFactor(pre_integrations[1]); // 预积分约束的残差计算
+        // 涉及到到参数块，最后一个是待边缘化的参数块的索引
+        auto* residual_block_info = new ResidualBlockInfo(imu_factor, nullptr,vector<double*>{para_Pose[0],
+                                                          para_SpeedBias[0], para_Pose[1], para_SpeedBias[1]},vector<int>{0, 1});
+        marginalization_info->addResidualBlockInfo(residual_block_info); // 这里就是第0和1个参数块是需要被边缘化的
       }
     }
 
@@ -932,7 +929,7 @@ void Estimator::optimization()
       for (auto& it_per_id: f_manager.feature)
       {
         it_per_id.used_num = (int)it_per_id.feature_per_frame.size();
-        if (!(it_per_id.used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2))
+        if (!(it_per_id.used_num >= 2 && it_per_id.start_frame < WINDOW_SIZE - 2)) // 只观测一次或者是距离最老帧太远的特征点不考虑
           continue;
 
         ++feature_index;
@@ -946,7 +943,7 @@ void Estimator::optimization()
         for (auto& it_per_frame: it_per_id.feature_per_frame)
         {
           imu_j++;
-          if (imu_i == imu_j)
+          if (imu_i == imu_j) // 自己和自己不能形成重投影约束
             continue;
 
           Vector3d pts_j = it_per_frame.point;
@@ -961,9 +958,9 @@ void Estimator::optimization()
           }
           else
           {
-            auto* f = new ProjectionFactor(pts_i, pts_j);
-            auto* residual_block_info = new ResidualBlockInfo(f, loss_function,vector<double *>{para_Pose[imu_i],
-                                                               para_Pose[imu_j], para_Ex_Pose[0], para_Feature[feature_index]},vector<int>{0, 3});
+            auto* f = new ProjectionFactor(pts_i, pts_j); // 构造函数是同一个特征点在不同帧的观测，计算重投影误差
+            auto* residual_block_info = new ResidualBlockInfo(f, loss_function, vector<double*>{para_Pose[imu_i],
+                                                              para_Pose[imu_j], para_Ex_Pose[0], para_Feature[feature_index]}, vector<int>{0, 3});
             marginalization_info->addResidualBlockInfo(residual_block_info);
           }
         }
@@ -989,14 +986,14 @@ void Estimator::optimization()
       addr_shift[reinterpret_cast<long>(para_SpeedBias[i])] = para_SpeedBias[i - 1];
     }
 
-    // 外参和时间延迟不需要滑窗偏移
+    // 外参和时间延迟不需要滑窗偏移，只有一个参数块，不需要在滑窗内维护
     for (auto& i: para_Ex_Pose)
       addr_shift[reinterpret_cast<long>(i)] = i;
     if (ESTIMATE_TD)
     {
       addr_shift[reinterpret_cast<long>(para_Td[0])] = para_Td[0];
     }
-    vector<double*> parameter_blocks = marginalization_info->getParameterBlocks(addr_shift);
+    vector<double*> parameter_blocks = marginalization_info->getParameterBlocks(addr_shift); // 得到边缘化后的参数块的地址
 
     // 释放上一次边缘化的内存
     delete last_marginalization_info;
@@ -1018,7 +1015,7 @@ void Estimator::optimization()
         {
           ROS_ASSERT(last_marginalization_parameter_blocks[i] != para_SpeedBias[WINDOW_SIZE - 1]);
           if (last_marginalization_parameter_blocks[i] == para_Pose[WINDOW_SIZE - 1])
-            drop_set.push_back(i);
+            drop_set.push_back(i); // 将倒数第二帧的位姿margin掉
         }
         // construct new marginalization_factor
         auto* marginalization_factor = new MarginalizationFactor(last_marginalization_info);
@@ -1060,7 +1057,7 @@ void Estimator::optimization()
         addr_shift[reinterpret_cast<long>(para_Td[0])] = para_Td[0];
       }
 
-      vector<double *> parameter_blocks = marginalization_info->getParameterBlocks(addr_shift);
+      vector<double*> parameter_blocks = marginalization_info->getParameterBlocks(addr_shift);
       delete last_marginalization_info;
       last_marginalization_info = marginalization_info;
       last_marginalization_parameter_blocks = parameter_blocks;

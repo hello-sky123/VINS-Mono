@@ -196,7 +196,7 @@ bool LinearAlignment(map<double, ImageFrame>& all_image_frame, Vector3d& g, Vect
   // 增强数值稳定性
   A = A * 1000.0;
   b = b * 1000.0;
-  x = A.ldlt().solve(b); // 对称正定矩阵的Cholesky分解
+  x = A.ldlt().solve(b); // 对称正定矩阵的Cholesky分解，求解线性方程组
   double s = x(n_state - 1) / 100.0;
   ROS_DEBUG("estimated scale: %f", s);
   g = x.segment<3>(n_state - 4);

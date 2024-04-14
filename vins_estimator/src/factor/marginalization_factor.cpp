@@ -16,28 +16,9 @@ void ResidualBlockInfo::Evaluate()
   {
     jacobians[i].resize(cost_function->num_residuals(), block_sizes[i]);
     raw_jacobians[i] = jacobians[i].data(); // 取出指针
-    //dim += block_sizes[i] == 7 ? 6 : block_sizes[i];
   }
   // 调用各自重载的Evaluate函数，计算残差和雅可比
   cost_function->Evaluate(parameter_blocks.data(), residuals.data(), raw_jacobians);
-
-  //std::vector<int> tmp_idx(block_sizes.size());
-  //Eigen::MatrixXd tmp(dim, dim);
-  //for (int i = 0; i < static_cast<int>(parameter_blocks.size()); i++)
-  //{
-  //    int size_i = localSize(block_sizes[i]);
-  //    Eigen::MatrixXd jacobian_i = jacobians[i].leftCols(size_i);
-  //    for (int j = 0, sub_idx = 0; j < static_cast<int>(parameter_blocks.size()); sub_idx += block_sizes[j] == 7 ? 6 : block_sizes[j], j++)
-  //    {
-  //        int size_j = localSize(block_sizes[j]);
-  //        Eigen::MatrixXd jacobian_j = jacobians[j].leftCols(size_j);
-  //        tmp_idx[j] = sub_idx;
-  //        tmp.block(tmp_idx[i], tmp_idx[j], size_i, size_j) = jacobian_i.transpose() * jacobian_j;
-  //    }
-  //}
-  //Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> saes(tmp);
-  //std::cout << saes.eigenvalues() << std::endl;
-  //ROS_ASSERT(saes.eigenvalues().minCoeff() >= -1e-6);
 
   if (loss_function)
   {
@@ -47,7 +28,6 @@ void ResidualBlockInfo::Evaluate()
 
     sq_norm = residuals.squaredNorm(); // 残差的模
     loss_function->Evaluate(sq_norm, rho);  // pho[0]是核函数值，pho[1]是核函数的一阶导数，pho[2]是核函数的二阶导数
-    //printf("sq_norm: %f, rho[0]: %f, rho[1]: %f, rho[2]: %f\n", sq_norm, rho[0], rho[1], rho[2]);
 
     double sqrt_rho1_ = sqrt(rho[1]);
 
@@ -75,9 +55,7 @@ void ResidualBlockInfo::Evaluate()
 }
 
 MarginalizationInfo::~MarginalizationInfo()
-{
-    //ROS_WARN("release marginlizationinfo");
-    
+{   
     for (auto it = parameter_block_data.begin(); it != parameter_block_data.end(); ++it)
         delete[] it->second;
 
@@ -216,40 +194,11 @@ void MarginalizationInfo::marginalize()
 
   n = pos - m;
 
-  //ROS_DEBUG("marginalization, pos: %d, m: %d, n: %d, size: %d", pos, m, n, (int)parameter_block_idx.size());
-
   TicToc t_summing;
   Eigen::MatrixXd A(pos, pos); // Ax = b 预设大小
   Eigen::VectorXd b(pos);
   A.setZero();
   b.setZero();
-  /*
-  for (auto it : factors)
-  {
-      for (int i = 0; i < static_cast<int>(it->parameter_blocks.size()); i++)
-      {
-          int idx_i = parameter_block_idx[reinterpret_cast<long>(it->parameter_blocks[i])];
-          int size_i = localSize(parameter_block_size[reinterpret_cast<long>(it->parameter_blocks[i])]);
-          Eigen::MatrixXd jacobian_i = it->jacobians[i].leftCols(size_i);
-          for (int j = i; j < static_cast<int>(it->parameter_blocks.size()); j++)
-          {
-              int idx_j = parameter_block_idx[reinterpret_cast<long>(it->parameter_blocks[j])];
-              int size_j = localSize(parameter_block_size[reinterpret_cast<long>(it->parameter_blocks[j])]);
-              Eigen::MatrixXd jacobian_j = it->jacobians[j].leftCols(size_j);
-              if (i == j)
-                  A.block(idx_i, idx_j, size_i, size_j) += jacobian_i.transpose() * jacobian_j;
-              else
-              {
-                  A.block(idx_i, idx_j, size_i, size_j) += jacobian_i.transpose() * jacobian_j;
-                  A.block(idx_j, idx_i, size_j, size_i) = A.block(idx_i, idx_j, size_i, size_j).transpose();
-              }
-          }
-          b.segment(idx_i, size_i) += jacobian_i.transpose() * it->residuals;
-      }
-  }
-  ROS_INFO("summing up costs %f ms", t_summing.toc());
-  */
-  //multi thread
 
   // 往矩阵A和向量b中填充数据，利用多线程加速
   TicToc t_thread_summing;
@@ -286,16 +235,12 @@ void MarginalizationInfo::marginalize()
     A += threadsstruct[i].A;
     b += threadsstruct[i].b;
   }
-  //ROS_DEBUG("thread summing up costs %f ms", t_thread_summing.toc());
-  //ROS_INFO("A diff %f , b diff %f ", (A - tmp_A).sum(), (b - tmp_b).sum());
 
 
   //TODO
   // Amm矩阵的构建是为了保证正定性
   Eigen::MatrixXd Amm = 0.5 * (A.block(0, 0, m, m) + A.block(0, 0, m, m).transpose());
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> saes(Amm); // 实对称矩阵或者复厄米特矩阵的特征值分解
-
-  //ROS_ASSERT_MSG(saes.eigenvalues().minCoeff() >= -1e-4, "min eigenvalue %f", saes.eigenvalues().minCoeff());
 
   // 一个逆矩阵的特征值是其原矩阵的特征值的倒数，特征向量不变，利用特征值取逆来构造逆矩阵，select类似于C++里的？：
   Eigen::MatrixXd Amm_inv = saes.eigenvectors() * Eigen::VectorXd((saes.eigenvalues().array() > eps).select(saes.eigenvalues().array().inverse(), 0)).asDiagonal() * saes.eigenvectors().transpose();
@@ -318,11 +263,6 @@ void MarginalizationInfo::marginalize()
 
   linearized_jacobians = S_sqrt.asDiagonal() * saes2.eigenvectors().transpose();
   linearized_residuals = S_inv_sqrt.asDiagonal() * saes2.eigenvectors().transpose() * b;
-  //std::cout << A << std::endl
-  //          << std::endl;
-  //std::cout << linearized_jacobians << std::endl;
-  //printf("error2: %f %f\n", (linearized_jacobians.transpose() * linearized_jacobians - A).sum(),
-  //      (linearized_jacobians.transpose() * linearized_residuals - b).sum());
 }
 
 std::vector<double*> MarginalizationInfo::getParameterBlocks(std::unordered_map<long, double*>& addr_shift)
@@ -360,7 +300,7 @@ MarginalizationFactor::MarginalizationFactor(MarginalizationInfo* _marginalizati
     mutable_parameter_block_sizes()->push_back(it); // 这里是ceres的接口，用于确定参数块的大小
     cnt += it;
   }
-  //printf("residual size: %d, %d\n", cnt, n);
+  
   set_num_residuals(marginalization_info->n); // 这里是ceres的接口，用于确定残差的维度，local size
 };
 
@@ -373,14 +313,6 @@ MarginalizationFactor::MarginalizationFactor(MarginalizationInfo* _marginalizati
  */
 bool MarginalizationFactor::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
 {
-  //printf("internal addr,%d, %d\n", (int)parameter_block_sizes().size(), num_residuals());
-  //for (int i = 0; i < static_cast<int>(keep_block_size.size()); i++)
-  //{
-  //    //printf("unsigned %x\n", reinterpret_cast<unsigned long>(parameters[i]));
-  //    //printf("signed %x\n", reinterpret_cast<long>(parameters[i]));
-  //printf("jacobian %x\n", reinterpret_cast<long>(jacobians));
-  //printf("residual %x\n", reinterpret_cast<long>(residuals));
-  //}
   int n = marginalization_info->n;
   int m = marginalization_info->m; // 边缘化掉的参数块的大小
   Eigen::VectorXd dx(n);

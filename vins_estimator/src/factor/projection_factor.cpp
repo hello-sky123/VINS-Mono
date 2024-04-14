@@ -167,13 +167,13 @@ void ProjectionFactor::check(double** parameters)
 
 
   Eigen::Vector2d residual;
-#ifdef UNIT_SPHERE_ERROR 
-  residual =  tangent_base * (pts_camera_j.normalized() - pts_j.normalized());
-#else
-  double dep_j = pts_camera_j.z();
-  residual = (pts_camera_j / dep_j).head<2>() - pts_j.head<2>();
-#endif
-  residual = sqrt_info * residual;
+  #ifdef UNIT_SPHERE_ERROR 
+    residual =  tangent_base * (pts_camera_j.normalized() - pts_j.normalized());
+  #else
+    double dep_j = pts_camera_j.z();
+    residual = (pts_camera_j / dep_j).head<2>() - pts_j.head<2>();
+  #endif
+    residual = sqrt_info * residual;
 
   puts("num");
   std::cout << residual.transpose() << std::endl;
@@ -182,47 +182,47 @@ void ProjectionFactor::check(double** parameters)
   Eigen::Matrix<double, 2, 19> num_jacobian;
   for (int k = 0; k < 19; k++)
   {
-      Eigen::Vector3d Pi(parameters[0][0], parameters[0][1], parameters[0][2]);
-      Eigen::Quaterniond Qi(parameters[0][6], parameters[0][3], parameters[0][4], parameters[0][5]);
+    Eigen::Vector3d Pi(parameters[0][0], parameters[0][1], parameters[0][2]);
+    Eigen::Quaterniond Qi(parameters[0][6], parameters[0][3], parameters[0][4], parameters[0][5]);
 
-      Eigen::Vector3d Pj(parameters[1][0], parameters[1][1], parameters[1][2]);
-      Eigen::Quaterniond Qj(parameters[1][6], parameters[1][3], parameters[1][4], parameters[1][5]);
+    Eigen::Vector3d Pj(parameters[1][0], parameters[1][1], parameters[1][2]);
+    Eigen::Quaterniond Qj(parameters[1][6], parameters[1][3], parameters[1][4], parameters[1][5]);
 
-      Eigen::Vector3d tic(parameters[2][0], parameters[2][1], parameters[2][2]);
-      Eigen::Quaterniond qic(parameters[2][6], parameters[2][3], parameters[2][4], parameters[2][5]);
-      double inv_dep_i = parameters[3][0];
+    Eigen::Vector3d tic(parameters[2][0], parameters[2][1], parameters[2][2]);
+    Eigen::Quaterniond qic(parameters[2][6], parameters[2][3], parameters[2][4], parameters[2][5]);
+    double inv_dep_i = parameters[3][0];
 
-      int a = k / 3, b = k % 3;
-      Eigen::Vector3d delta = Eigen::Vector3d(b == 0, b == 1, b == 2) * eps;
+    int a = k / 3, b = k % 3;
+    Eigen::Vector3d delta = Eigen::Vector3d(b == 0, b == 1, b == 2) * eps;
 
-      if (a == 0)
-          Pi += delta;
-      else if (a == 1)
-          Qi = Qi * Utility::deltaQ(delta);
-      else if (a == 2)
-          Pj += delta;
-      else if (a == 3)
-          Qj = Qj * Utility::deltaQ(delta);
-      else if (a == 4)
-          tic += delta;
-      else if (a == 5)
-          qic = qic * Utility::deltaQ(delta);
-      else if (a == 6)
-          inv_dep_i += delta.x();
+    if (a == 0)
+      Pi += delta;
+    else if (a == 1)
+      Qi = Qi * Utility::deltaQ(delta);
+    else if (a == 2)
+      Pj += delta;
+    else if (a == 3)
+      Qj = Qj * Utility::deltaQ(delta);
+    else if (a == 4)
+      tic += delta;
+    else if (a == 5)
+      qic = qic * Utility::deltaQ(delta);
+    else if (a == 6)
+      inv_dep_i += delta.x();
 
-      Eigen::Vector3d pts_camera_i = pts_i / inv_dep_i;
-      Eigen::Vector3d pts_imu_i = qic * pts_camera_i + tic;
-      Eigen::Vector3d pts_w = Qi * pts_imu_i + Pi;
-      Eigen::Vector3d pts_imu_j = Qj.inverse() * (pts_w - Pj);
-      Eigen::Vector3d pts_camera_j = qic.inverse() * (pts_imu_j - tic);
+    Eigen::Vector3d pts_camera_i = pts_i / inv_dep_i;
+    Eigen::Vector3d pts_imu_i = qic * pts_camera_i + tic;
+    Eigen::Vector3d pts_w = Qi * pts_imu_i + Pi;
+    Eigen::Vector3d pts_imu_j = Qj.inverse() * (pts_w - Pj);
+    Eigen::Vector3d pts_camera_j = qic.inverse() * (pts_imu_j - tic);
 
-      Eigen::Vector2d tmp_residual;
-#ifdef UNIT_SPHERE_ERROR 
+    Eigen::Vector2d tmp_residual;
+    #ifdef UNIT_SPHERE_ERROR 
       tmp_residual =  tangent_base * (pts_camera_j.normalized() - pts_j.normalized());
-#else
+    #else
       double dep_j = pts_camera_j.z();
       tmp_residual = (pts_camera_j / dep_j).head<2>() - pts_j.head<2>();
-#endif
+    #endif
       tmp_residual = sqrt_info * tmp_residual;
       num_jacobian.col(k) = (tmp_residual - residual) / eps;
   }

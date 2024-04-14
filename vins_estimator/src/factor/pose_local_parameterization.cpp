@@ -2,12 +2,12 @@
 
 bool PoseLocalParameterization::Plus(const double* x, const double* delta, double* x_plus_delta) const
 {
-  Eigen::Map<const Eigen::Vector3d> _p(x); // Eigen::map
+  Eigen::Map<const Eigen::Vector3d> _p(x); // Eigen::map将x映射为Eigen::Vector3d类型
   Eigen::Map<const Eigen::Quaterniond> _q(x + 3);
 
   Eigen::Map<const Eigen::Vector3d> dp(delta);
 
-  Eigen::Quaterniond dq = Utility::deltaQ(Eigen::Map<const Eigen::Vector3d>(delta + 3));
+  Eigen::Quaterniond dq = Utility::deltaQ(Eigen::Map<const Eigen::Vector3d>(delta + 3)); // deltaQ由角度旋转量delta构造旋转四元数
 
   Eigen::Map<Eigen::Vector3d> p(x_plus_delta);
   Eigen::Map<Eigen::Quaterniond> q(x_plus_delta + 3);
@@ -17,7 +17,8 @@ bool PoseLocalParameterization::Plus(const double* x, const double* delta, doubl
 
   return true;
 }
-bool PoseLocalParameterization::ComputeJacobian(const double *x, double *jacobian) const
+
+bool PoseLocalParameterization::ComputeJacobian(const double* x, double* jacobian) const
 {
   Eigen::Map<Eigen::Matrix<double, 7, 6, Eigen::RowMajor>> j(jacobian);
   j.topRows<6>().setIdentity();

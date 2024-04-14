@@ -16,6 +16,7 @@ class IMUFactor: public ceres::SizedCostFunction<15, 7, 9, 7, 9>
    IMUFactor() = delete;
    explicit IMUFactor(IntegrationBase* _pre_integration): pre_integration(_pre_integration)
    { }
+   
    // parameters: 优化变量，double const* const*用于指向一个二维数组，有两种指针的方式指向二维数组，一种是数组指针，另一种是指针数组
    // 1. 数组指针：double (*parameters)[7]，指向一个数组，7代表了二维数组的列数，数组中每个元素是一个double类型的指针，指向了每一行行首，
    // 可以直接使用二维数组的数组名来初始化数组指针，如double a[2][3] = {{1, 2, 3}, {4, 5, 6}}; double (*p)[3] = a;
@@ -46,29 +47,13 @@ class IMUFactor: public ceres::SizedCostFunction<15, 7, 9, 7, 9>
      Eigen::Vector3d Baj(parameters[3][3], parameters[3][4], parameters[3][5]);
      Eigen::Vector3d Bgj(parameters[3][6], parameters[3][7], parameters[3][8]);
 
-     //Eigen::Matrix<double, 15, 15> Fd;
-     //Eigen::Matrix<double, 15, 12> Gd;
-
-     //Eigen::Vector3d pPj = Pi + Vi * sum_t - 0.5 * g * sum_t * sum_t + corrected_delta_p;
-     //Eigen::Quaterniond pQj = Qi * delta_q;
-     //Eigen::Vector3d pVj = Vi - g * sum_t + corrected_delta_v;
-     //Eigen::Vector3d pBaj = Bai;
-     //Eigen::Vector3d pBgj = Bgi;
-
-     //Vi + Qi * delta_v - g * sum_dt = Vj;
-     //Qi * delta_q = Qj;
-
-     //delta_p = Qi.inverse() * (0.5 * g * sum_dt * sum_dt + Pj - Pi);
-     //delta_v = Qi.inverse() * (g * sum_dt + Vj - Vi);
-     //delta_q = Qi.inverse() * Qj;
-
-  #if 0
-     if ((Bai - pre_integration->linearized_ba).norm() > 0.10 ||
-        (Bgi - pre_integration->linearized_bg).norm() > 0.01)
-     {
-       pre_integration->repropagate(Bai, Bgi);
-     }
-  #endif
+     #if 0
+       if ((Bai - pre_integration->linearized_ba).norm() > 0.10 ||
+          (Bgi - pre_integration->linearized_bg).norm() > 0.01)
+       {
+         pre_integration->repropagate(Bai, Bgi);
+       }
+     #endif
 
      Eigen::Map<Eigen::Matrix<double, 15, 1>> residual(residuals);
      // 得到残差
@@ -95,8 +80,6 @@ class IMUFactor: public ceres::SizedCostFunction<15, 7, 9, 7, 9>
        if (pre_integration->jacobian.maxCoeff() > 1e8 || pre_integration->jacobian.minCoeff() < -1e8)
        {
          ROS_WARN("numerical unstable in preintegration");
-         //std::cout << pre_integration->jacobian << std::endl;
-         // ROS_BREAK();
        }
 
        if (jacobians[0])
@@ -121,8 +104,6 @@ class IMUFactor: public ceres::SizedCostFunction<15, 7, 9, 7, 9>
          if (jacobian_pose_i.maxCoeff() > 1e8 || jacobian_pose_i.minCoeff() < -1e8)
          {
            ROS_WARN("numerical unstable in preintegration");
-           //std::cout << sqrt_info << std::endl;
-           //ROS_BREAK();
          }
        }
 
@@ -137,8 +118,6 @@ class IMUFactor: public ceres::SizedCostFunction<15, 7, 9, 7, 9>
        #if 0
           jacobian_speedbias_i.block<3, 3>(O_R, O_BG - O_V) = -dq_dbg;
        #else
-          //Eigen::Quaterniond corrected_delta_q = pre_integration->delta_q * Utility::deltaQ(dq_dbg * (Bgi - pre_integration->linearized_bg));
-          //jacobian_speedbias_i.block<3, 3>(O_R, O_BG - O_V) = -Utility::Qleft(Qj.inverse() * Qi * corrected_delta_q).bottomRightCorner<3, 3>() * dq_dbg;
           jacobian_speedbias_i.block<3, 3>(O_R, O_BG - O_V) = -Utility::Qleft(Qj.inverse() * Qi * pre_integration->delta_q).bottomRightCorner<3, 3>() * dq_dbg;
        #endif
 
@@ -151,9 +130,6 @@ class IMUFactor: public ceres::SizedCostFunction<15, 7, 9, 7, 9>
           jacobian_speedbias_i.block<3, 3>(O_BG, O_BG - O_V) = -Eigen::Matrix3d::Identity();
 
           jacobian_speedbias_i = sqrt_info * jacobian_speedbias_i;
-
-          //ROS_ASSERT(fabs(jacobian_speedbias_i.maxCoeff()) < 1e8);
-          //ROS_ASSERT(fabs(jacobian_speedbias_i.minCoeff()) < 1e8);
        }
 
        if (jacobians[2])
@@ -171,9 +147,6 @@ class IMUFactor: public ceres::SizedCostFunction<15, 7, 9, 7, 9>
        #endif
 
          jacobian_pose_j = sqrt_info * jacobian_pose_j;
-
-         //ROS_ASSERT(fabs(jacobian_pose_j.maxCoeff()) < 1e8);
-         //ROS_ASSERT(fabs(jacobian_pose_j.minCoeff()) < 1e8);
        }
 
        if (jacobians[3])
@@ -188,20 +161,12 @@ class IMUFactor: public ceres::SizedCostFunction<15, 7, 9, 7, 9>
          jacobian_speedbias_j.block<3, 3>(O_BG, O_BG - O_V) = Eigen::Matrix3d::Identity();
 
          jacobian_speedbias_j = sqrt_info * jacobian_speedbias_j;
-
-         //ROS_ASSERT(fabs(jacobian_speedbias_j.maxCoeff()) < 1e8);
-         //ROS_ASSERT(fabs(jacobian_speedbias_j.minCoeff()) < 1e8);
        }
      }
 
      return true;
    }
 
-    //bool Evaluate_Direct(double const *const *parameters, Eigen::Matrix<double, 15, 1> &residuals, Eigen::Matrix<double, 15, 30> &jacobians);
-
-    //void checkCorrection();
-    //void checkTransition();
-    //void checkJacobian(double **parameters);
    IntegrationBase* pre_integration;
 
 };

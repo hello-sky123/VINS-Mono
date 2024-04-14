@@ -310,7 +310,7 @@ void FeatureManager::removeBackShiftDepth(const Eigen::Matrix3d& marg_R, const E
       }
       else
       {
-        Eigen::Vector3d pts_i = uv_i * it->estimated_depth; // 实际坐标系下的坐标
+        Eigen::Vector3d pts_i = uv_i * it->estimated_depth; // 相机坐标系下的坐标
         Eigen::Vector3d w_pts_i = marg_R * pts_i + marg_P; // 世界坐标系下的坐标
         Eigen::Vector3d pts_j = new_R.transpose() * (w_pts_i - new_P); // 新的最老帧相机坐标系下的坐标
         double dep_j = pts_j(2);
@@ -320,13 +320,6 @@ void FeatureManager::removeBackShiftDepth(const Eigen::Matrix3d& marg_R, const E
           it->estimated_depth = INIT_DEPTH;
       }
     }
-    // remove tracking-lost feature after marginalize
-    /*
-    if (it->endFrame() < WINDOW_SIZE - 1)
-    {
-        feature.erase(it);
-    }
-    */
   }
 }
 
@@ -335,16 +328,16 @@ void FeatureManager::removeBack()
 {
   for (auto it = feature.begin(), it_next = feature.begin(); it != feature.end(); it = it_next)
   {
-      it_next++;
+    it_next++;
 
-      if (it->start_frame != 0)
-        it->start_frame--;
-      else
-      {
-        it->feature_per_frame.erase(it->feature_per_frame.begin());
-        if (it->feature_per_frame.empty())
-          feature.erase(it);
-      }
+    if (it->start_frame != 0)
+      it->start_frame--;
+    else
+    {
+      it->feature_per_frame.erase(it->feature_per_frame.begin());
+      if (it->feature_per_frame.empty())
+        feature.erase(it);
+    }
   }
 }
 

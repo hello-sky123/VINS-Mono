@@ -238,7 +238,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
 }
 
 /**
- * @brief VIO初始化，将滑窗内的P、V和Q恢复到第0帧并且和中立进行对齐
+ * @brief VIO初始化，将滑窗内的P、V和Q恢复到第0帧并且和重力进行对齐
  * @return bool
  */
 bool Estimator::initialStructure()
@@ -572,6 +572,7 @@ void Estimator::vector2double()
     para_SpeedBias[i][7] = Bgs[i].y();
     para_SpeedBias[i][8] = Bgs[i].z();
   }
+
   for (int i = 0; i < NUM_OF_CAM; i++)
   {
     para_Ex_Pose[i][0] = tic[i].x();
@@ -727,9 +728,9 @@ void Estimator::optimization()
   // 借助ceres进行非线性优化
   ceres::Problem problem;
   ceres::LossFunction* loss_function; // 核函数
-  //loss_function = new ceres::HuberLoss(1.0); a控制分段函数的分段点
+  // loss_function = new ceres::HuberLoss(1.0); a控制分段函数的分段点
   // CauchyLoss通过参数a来控制核函数的增长速度，a越大，增长越快，对outlier容忍性越低
-  loss_function = new ceres::CauchyLoss(1.0); // Cauchy鲁棒核函数
+  loss_function = new ceres::CauchyLoss(1.0); // Cauchy鲁棒核函数, pho(s) = a ** 2 * log(1 + (s / a ** 2))
 
   // step1： 定义待优化的参数块
   // 参数块1 滑窗中的位姿包括位置和姿态，维度为7（更新方式不是广义加的需要以定义添加参数块方式指定更新方法）
@@ -739,9 +740,10 @@ void Estimator::optimization()
     problem.AddParameterBlock(para_Pose[i], SIZE_POSE, local_parameterization);
     problem.AddParameterBlock(para_SpeedBias[i], SIZE_SPEEDBIAS);
   }
+
   for (auto& i: para_Ex_Pose)
   {
-    ceres::LocalParameterization *local_parameterization = new PoseLocalParameterization();
+    ceres::LocalParameterization* local_parameterization = new PoseLocalParameterization();
     problem.AddParameterBlock(i, SIZE_POSE, local_parameterization);
     if (!ESTIMATE_EXTRINSIC)
     {
@@ -751,14 +753,14 @@ void Estimator::optimization()
     else
       ROS_DEBUG("estimate extrinsic param");
   }
+
   if (ESTIMATE_TD)
   {
     problem.AddParameterBlock(para_Td[0], 1);
-    //problem.SetParameterBlockConstant(para_Td[0]);
   }
 
   TicToc t_whole, t_prepare;
-  // eigen->double
+  // eigen->double数组
   vector2double();
 
   // step2: 通过残差的约束添加残差块，类似于G2O中的edge
@@ -811,15 +813,6 @@ void Estimator::optimization()
                                             it_per_id.feature_per_frame[0].cur_td, it_per_frame.cur_td,
                                             it_per_id.feature_per_frame[0].uv.y(), it_per_frame.uv.y());
         problem.AddResidualBlock(f_td, loss_function, para_Pose[imu_i], para_Pose[imu_j], para_Ex_Pose[0], para_Feature[feature_index], para_Td[0]);
-        /*
-        double **para = new double *[5];
-        para[0] = para_Pose[imu_i];
-        para[1] = para_Pose[imu_j];
-        para[2] = para_Ex_Pose[0];
-        para[3] = para_Feature[feature_index];
-        para[4] = para_Td[0];
-        f_td->check(para);
-        */
       }
       else
       {
@@ -879,9 +872,6 @@ void Estimator::optimization()
   //options.num_threads = 2;
   options.trust_region_strategy_type = ceres::DOGLEG;
   options.max_num_iterations = NUM_ITERATIONS;
-  //options.use_explicit_schur_complement = true;
-  //options.minimizer_progress_to_stdout = true;
-  //options.use_nonmonotonic_steps = true;
   if (marginalization_flag == MARGIN_OLD)
     options.max_solver_time_in_seconds = SOLVER_TIME * 4.0 / 5.0;
   else
@@ -1091,10 +1081,11 @@ void Estimator::slideWindow()
     double t_0 = Headers[0].stamp.toSec();
     back_R0 = Rs[0];
     back_P0 = Ps[0];
+
     // 必须是填满了滑窗才可以滑动
     if (frame_count == WINDOW_SIZE)
     {
-      // 一帧一帧的滑动，滑动完成之后，最老帧在滑窗的位置就是最新帧的位置
+      // 一帧一帧的滑动，滑动完成之后，最老帧在滑窗的位置就是最新帧的位置，其他帧依次往前移动
       for (int i = 0; i < WINDOW_SIZE; i++)
       {
         Rs[i].swap(Rs[i + 1]);
@@ -1111,6 +1102,7 @@ void Estimator::slideWindow()
         Bas[i].swap(Bas[i + 1]);
         Bgs[i].swap(Bgs[i + 1]);
       }
+
       // 最后一帧的状态量赋上当前值
       Headers[WINDOW_SIZE] = Headers[WINDOW_SIZE - 1];
       Ps[WINDOW_SIZE] = Ps[WINDOW_SIZE - 1];
@@ -1150,8 +1142,8 @@ void Estimator::slideWindow()
         Vector3d tmp_linear_acceleration = linear_acceleration_buf[frame_count][i];
         Vector3d tmp_angular_velocity = angular_velocity_buf[frame_count][i];
 
+        // 将最后一帧前的imu测量信息添加到上一个预积分的测量信息中
         pre_integrations[frame_count - 1]->push_back(tmp_dt, tmp_linear_acceleration, tmp_angular_velocity);
-
         dt_buf[frame_count - 1].push_back(tmp_dt);
         linear_acceleration_buf[frame_count - 1].push_back(tmp_linear_acceleration);
         angular_velocity_buf[frame_count - 1].push_back(tmp_angular_velocity);
@@ -1195,15 +1187,15 @@ void Estimator::slideWindowOld()
     Matrix3d R0, R1;
     Vector3d P0, P1;
     // back_R0是最老帧的位姿，back_P0是最老帧的位置
-    R0 = back_R0 * ric[0];
-    R1 = Rs[0] * ric[0];
+    R0 = back_R0 * ric[0]; // 转换为Rwc
+    R1 = Rs[0] * ric[0]; // 倒数第二帧的Rwc
     P0 = back_P0 + back_R0 * tic[0];
     P1 = Ps[0] + Rs[0] * tic[0];
     // 把移除帧看见的地图点的管理权移交给当前最老帧
-    f_manager.removeBackShiftDepth(R0, P0, R1, P1);
+    f_manager.removeBackShiftDepth(R0, P0, R1, P1); // 将最老帧看到的地图点移交给次老帧（坐标变换到该帧坐标系下）
   }
   else
-    f_manager.removeBack();
+    f_manager.removeBack(); // 如果初始化没有完成，则将最老帧之外的其余起始帧--，同时将每个特征点在最老帧上的观测帧删掉
 }
 
 /**

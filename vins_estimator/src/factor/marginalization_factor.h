@@ -23,8 +23,8 @@ struct ResidualBlockInfo
 
   ceres::CostFunction* cost_function;
   ceres::LossFunction* loss_function;
-  std::vector<double*> parameter_blocks;
-  std::vector<int> drop_set;
+  std::vector<double*> parameter_blocks; // 参数块的地址
+  std::vector<int> drop_set; // 待边缘化的参数块的id
 
   double** raw_jacobians;
   std::vector<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> jacobians;
@@ -56,8 +56,8 @@ class MarginalizationInfo
    void marginalize();
    std::vector<double*> getParameterBlocks(std::unordered_map<long, double*>& addr_shift);
 
-   std::vector<ResidualBlockInfo*> factors;
-   int m, n;
+   std::vector<ResidualBlockInfo*> factors; // 所有观测项
+   int m, n; // m是要margin掉的变量个数，n是要保留下的变量个数
    std::unordered_map<long, int> parameter_block_size; //global size // 地址->global size
    int sum_block_size;
    std::unordered_map<long, int> parameter_block_idx; //local size // 地址->参数排列的顺序idx
@@ -73,11 +73,11 @@ class MarginalizationInfo
 
 };
 
-class MarginalizationFactor : public ceres::CostFunction // 由于边缘化的costfuntion不是固定大小的，因此只能继承最基本的类
+class MarginalizationFactor: public ceres::CostFunction // 由于边缘化的costfuntion不是固定大小的，因此只能继承最基本的类
 {
  public:
    explicit MarginalizationFactor(MarginalizationInfo* _marginalization_info);
-   bool Evaluate(double const *const *parameters, double *residuals, double **jacobians) const override;
+   bool Evaluate(double const *const * parameters, double* residuals, double** jacobians) const override;
 
    MarginalizationInfo* marginalization_info;
 };

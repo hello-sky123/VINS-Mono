@@ -223,7 +223,6 @@ void restart_callback(const std_msgs::BoolConstPtr& restart_msg)
 
 void relocalization_callback(const sensor_msgs::PointCloudConstPtr &points_msg)
 {
-  //printf("relocalization callback! \n");
   m_buf.lock();
   relo_buf.push(points_msg);
   m_buf.unlock();
@@ -316,6 +315,7 @@ void process()
           u_v_id.z() = point.z; // 回环帧的归一化坐标和特征点id
           match_points.push_back(u_v_id);
         }
+
         // 回环帧的位姿
         Vector3d relo_t(relo_msg->channels[0].values[0], relo_msg->channels[0].values[1], relo_msg->channels[0].values[2]);
         Quaterniond relo_q(relo_msg->channels[0].values[3], relo_msg->channels[0].values[4], relo_msg->channels[0].values[5], relo_msg->channels[0].values[6]);
@@ -326,7 +326,6 @@ void process()
       }
 
       ROS_DEBUG("processing vision data with stamp %f \n", img_msg->header.stamp.toSec());
-
       TicToc t_s;
       // 特征点id->特征点数据
       map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> image;
@@ -362,7 +361,6 @@ void process()
       pubKeyframe(estimator);
       if (relo_msg != nullptr)
         pubRelocalization(estimator);
-      //ROS_ERROR("end: %f, at %f", img_msg->header.stamp.toSec(), ros::Time::now().toSec());
     }
     m_estimator.unlock();
     m_buf.lock();

@@ -1,7 +1,7 @@
 #include "keyframe.h"
 
 template <typename Derived>
-static void reduceVector(vector<Derived> &v, vector<uchar> status)
+static void reduceVector(vector<Derived>& v, vector<uchar> status)
 {
   int j = 0;
   for (int i = 0; i < int(v.size()); i++)
@@ -25,8 +25,8 @@ static void reduceVector(vector<Derived> &v, vector<uchar> status)
  * @param _sequence 地图的序列号
  */
 KeyFrame::KeyFrame(double _time_stamp, int _index, Vector3d& _vio_T_w_i, Matrix3d& _vio_R_w_i, cv::Mat& _image,
-		           vector<cv::Point3f>& _point_3d, vector<cv::Point2f>& _point_2d_uv, vector<cv::Point2f>& _point_2d_norm,
-		           vector<double>& _point_id, int _sequence)
+		               vector<cv::Point3f>& _point_3d, vector<cv::Point2f>& _point_2d_uv, vector<cv::Point2f>& _point_2d_norm,
+		               vector<double>& _point_id, int _sequence)
 {
   time_stamp = _time_stamp;
   index = _index;
@@ -47,9 +47,9 @@ KeyFrame::KeyFrame(double _time_stamp, int _index, Vector3d& _vio_T_w_i, Matrix3
   has_fast_point = false;
   loop_info << 0, 0, 0, 0, 0, 0, 0, 0;
   sequence = _sequence;
-  computeWindowBRIEFPoint();
-  computeBRIEFPoint();
-  if(!DEBUG_IMAGE)
+  computeWindowBRIEFPoint(); // 计算已有特征点的描述子
+  computeBRIEFPoint(); // 额外提取fast角点并计算BRIEF描述子
+  if (!DEBUG_IMAGE)
     image.release();
 }
 
@@ -84,13 +84,16 @@ KeyFrame::KeyFrame(double _time_stamp, int _index, Vector3d& _vio_T_w_i, Matrix3
   brief_descriptors = _brief_descriptors;
 }
 
+/**
+ * @brief 计算已有特征点的描述子
+ */
 void KeyFrame::computeWindowBRIEFPoint()
 {
   BriefExtractor extractor(BRIEF_PATTERN_FILE); // 定义一个描述子计算的对象
   for(const auto& i: point_2d_uv)
   {
     cv::KeyPoint key;
-    key.pt = i; // 像素坐标用来计算描述子
+    key.pt = i; // 关键点用来计算描述子
     window_keypoints.push_back(key);
   }
   extractor(image, window_keypoints, window_brief_descriptors);
@@ -139,15 +142,14 @@ bool KeyFrame::searchInAera(const BRIEF::bitset& window_descriptor, const std::v
   int bestIndex = -1;
   for(int i = 0; i < (int)descriptors_old.size(); i++)
   {
-
-    int dis = HammingDis(window_descriptor, descriptors_old[i]);
-    if(dis < bestDist) // 找到匹配得分最高的
+    int dis = HammingDis(window_descriptor, descriptors_old[i]); // 对应位置不同的个数越多，值越大
+    if (dis < bestDist) // 找到匹配得分最高的
     {
       bestDist = dis;
       bestIndex = i;
     }
   }
-  //printf("best dist %d", bestDist);
+  
   if (bestIndex != -1 && bestDist < 80) // 如果匹配得分过低，则认为没有匹配成功
   {
     best_match = keypoints_old[bestIndex].pt;
@@ -172,7 +174,7 @@ void KeyFrame::searchByBRIEFDes(std::vector<cv::Point2f>& matched_2d_old, std::v
                                 const std::vector<cv::KeyPoint>& keypoints_old, const std::vector<cv::KeyPoint>& keypoints_old_norm)
 {
   // 遍历当前帧的光流角点进行描述子匹配
-  for(const auto& window_brief_descriptor: window_brief_descriptors)
+  for (const auto& window_brief_descriptor: window_brief_descriptors)
   {
     cv::Point2f pt(0.f, 0.f);
     cv::Point2f pt_norm(0.f, 0.f);
@@ -223,9 +225,6 @@ void KeyFrame::FundmantalMatrixRANSAC(const std::vector<cv::Point2f>& matched_2d
 void KeyFrame::PnPRANSAC(const vector<cv::Point2f>& matched_2d_old_norm, const std::vector<cv::Point3f>& matched_3d,
                          std::vector<uchar>& status, Eigen::Vector3d& PnP_T_old, Eigen::Matrix3d& PnP_R_old)
 {
-  //for (int i = 0; i < matched_3d.size(); i++)
-  //	printf("3d x: %f, y: %f, z: %f\n",matched_3d[i].x, matched_3d[i].y, matched_3d[i].z );
-  //printf("match size %d \n", matched_3d.size());
   cv::Mat r, rvec, t, D, tmp_r;
   cv::Mat K = (cv::Mat_<double>(3, 3) << 1.0, 0, 0, 0, 1.0, 0, 0, 0, 1.0); // 由于使用的是归一化坐标，因此设置内参为单位阵
   Matrix3d R_inital;
@@ -244,12 +243,12 @@ void KeyFrame::PnPRANSAC(const vector<cv::Point2f>& matched_2d_old_norm, const s
   cv::Mat inliers;
   TicToc t_pnp_ransac;
   // 使用当前位姿作为起始位姿，考虑到回环帧和当前帧的位姿差距不会太大
-  solvePnPRansac(matched_3d, matched_2d_old_norm, K, D, rvec, t, true, 100, 10.0 / 460.0, 0.99, inliers);
+  solvePnPRansac(matched_3d, matched_2d_old_norm, K, D, rvec, t, true, 100, 10.0 / 460.0, 0.99, inliers); // Tcw
 
   for (int i = 0; i < (int)matched_2d_old_norm.size(); i++)
     status.push_back(0);
 
-  for( int i = 0; i < inliers.rows; i++)
+  for (int i = 0; i < inliers.rows; i++)
   {
     int n = inliers.at<int>(i);
     status[n] = 1;
@@ -277,7 +276,6 @@ void KeyFrame::PnPRANSAC(const vector<cv::Point2f>& matched_2d_old_norm, const s
 bool KeyFrame::findConnection(KeyFrame* old_kf)
 {
   TicToc tmp_t;
-  // printf("find Connection\n");
   vector<cv::Point2f> matched_2d_cur, matched_2d_old;
   vector<cv::Point2f> matched_2d_cur_norm, matched_2d_old_norm;
   vector<cv::Point3f> matched_3d;
@@ -315,7 +313,7 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
       cv::imwrite( path.str().c_str(), loop_match_img);
     }
   #endif
-  // printf("search by des\n");
+  
   // 通过描述子check
   searchByBRIEFDes(matched_2d_old, matched_2d_old_norm, status, old_kf->brief_descriptors, old_kf->keypoints, old_kf->keypoints_norm);
   reduceVector(matched_2d_cur, status);
@@ -372,16 +370,7 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
 
     }
   #endif
-  status.clear();
-  /*
-  FundamentalMatrixRANSAC(matched_2d_cur_norm, matched_2d_old_norm, status);
-  reduceVector(matched_2d_cur, status);
-  reduceVector(matched_2d_old, status);
-  reduceVector(matched_2d_cur_norm, status);
-  reduceVector(matched_2d_old_norm, status);
-  reduceVector(matched_3d, status);
-  reduceVector(matched_id, status);
-  */
+  
   #if 0
     if (DEBUG_IMAGE)
     {
@@ -466,13 +455,6 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
         putText(notation, "previous frame: " + to_string(old_kf->index) + "  sequence: " + to_string(old_kf->sequence), cv::Point2f(float(20 + COL + gap), 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
         cv::vconcat(notation, loop_match_img, loop_match_img);
 
-        /*
-        ostringstream path;
-        path <<  "/home/tony-ws1/raw_data/loop_image/"
-                << index << "-"
-                << old_kf->index << "-" << "3pnp_match.jpg";
-        cv::imwrite( path.str().c_str(), loop_match_img);
-        */
         if ((int)matched_2d_cur.size() > MIN_LOOP_NUM)
         {
           /*
@@ -496,9 +478,7 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
     relative_t = PnP_R_old.transpose() * (origin_vio_T - PnP_T_old);
     relative_q = PnP_R_old.transpose() * origin_vio_R;
     relative_yaw = Utility::normalizeAngle(Utility::R2ypr(origin_vio_R).x() - Utility::R2ypr(PnP_R_old).x());
-    // printf("PNP relative\n");
-    // cout << "pnp relative_t " << relative_t.transpose() << endl;
-    // cout << "pnp relative_yaw " << relative_yaw << endl;
+    
     if (abs(relative_yaw) < 30.0 && relative_t.norm() < 20.0) // 只有yaw和平移量都小于阈值才认为回环成功
     {
       has_loop = true;
@@ -506,7 +486,7 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
       loop_info << relative_t.x(), relative_t.y(), relative_t.z(),
                    relative_q.w(), relative_q.x(), relative_q.y(), relative_q.z(),
                    relative_yaw;
-      if(FAST_RELOCALIZATION)
+      if (FAST_RELOCALIZATION)
       {
         sensor_msgs::PointCloud msg_match_points;
         msg_match_points.header.stamp = ros::Time(time_stamp);
@@ -537,7 +517,6 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
       return true;
     }
   }
-  // printf("loop final use num %d %lf--------------- \n", (int)matched_2d_cur.size(), t_match.toc());
   return false;
 }
 

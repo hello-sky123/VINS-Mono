@@ -57,13 +57,14 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
     m_drift.unlock();
   }
 
-  // 更新VIO位姿
+  // 若检测到回环，更新VIO位姿
   cur_kf->getVioPose(vio_P_cur, vio_R_cur); // 得到VIO节点的位姿
   vio_P_cur = w_r_vio * vio_P_cur + w_t_vio; // 回环修正后消除累计误差的VIO位姿
   vio_R_cur = w_r_vio *  vio_R_cur;
   cur_kf->updateVioPose(vio_P_cur, vio_R_cur); // 更新VIO位姿
   cur_kf->index = global_index;
   global_index++;
+
   int loop_index = -1;
   if (flag_detect_loop)
   {
@@ -74,9 +75,9 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
   {
     addKeyFrameIntoVoc(cur_kf);
   }
+
   if (loop_index != -1) // 找到了有效回环
   {
-    // printf(" %d detect loop with %d \n", cur_kf->index, loop_index);
     KeyFrame* old_kf = getKeyFrame(loop_index); // 得到回环帧的指针
 
     if (cur_kf->findConnection(old_kf)) // 如果确定两帧回环
@@ -99,6 +100,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
       double shift_yaw;
       Matrix3d shift_r;
       Vector3d shift_t;
+
       // 回环矫正前的位姿认为是T_w'_cur, 下面求得的是T_w_w' = T_w_cur * T_cur_w'
       shift_yaw = Utility::R2ypr(w_R_cur).x() - Utility::R2ypr(vio_R_cur).x();
       shift_r = Utility::ypr2R(Vector3d(shift_yaw, 0, 0));
@@ -114,6 +116,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
         vio_R_cur = w_r_vio *  vio_R_cur;
         cur_kf->updateVioPose(vio_P_cur, vio_R_cur); // 更新VIO位姿
         auto it = keyframelist.begin();
+
         // 同时把这个sequence的所有节点的VIO位姿都更新到之前的sequence坐标系下
         for (; it != keyframelist.end(); it++)
         {
@@ -134,6 +137,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
       m_optimize_buf.unlock();
     }
   }
+
   m_keyframelist.lock();
   Vector3d P;
   Matrix3d R;
@@ -172,6 +176,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
                     << endl;
     loop_path_file.close();
   }
+
   // draw local connection
   if (SHOW_S_EDGE)
   {
@@ -182,7 +187,7 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
           break;
       Vector3d conncected_P;
       Matrix3d connected_R;
-      if((*rit)->sequence == cur_kf->sequence)
+      if ((*rit)->sequence == cur_kf->sequence)
       {
         (*rit)->getPose(conncected_P, connected_R);
         posegraph_visualization->add_edge(P, conncected_P);
@@ -190,25 +195,22 @@ void PoseGraph::addKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
       rit++;
     }
   }
+
   if (SHOW_L_EDGE)
   {
     if (cur_kf->has_loop)
     {
-      //printf("has loop \n");
       KeyFrame* connected_KF = getKeyFrame(cur_kf->loop_index);
       Vector3d connected_P,P0;
       Matrix3d connected_R,R0;
       connected_KF->getPose(connected_P, connected_R);
-      // cur_kf->getVioPose(P0, R0);
       cur_kf->getPose(P0, R0);
       if(cur_kf->sequence > 0)
       {
-        // printf("add loop into visual \n");
         posegraph_visualization->add_loopedge(P0, connected_P + Vector3d(VISUALIZATION_SHIFT_X, VISUALIZATION_SHIFT_Y, 0));
       }
     }
   }
-  // posegraph_visualization->add_pose(P + Vector3d(VISUALIZATION_SHIFT_X, VISUALIZATION_SHIFT_Y, 0), Q);
 
   keyframelist.push_back(cur_kf); // 将当前帧加入到关键帧列表中
   publish();
@@ -276,19 +278,9 @@ void PoseGraph::loadKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
       rit++;
     }
   }
-  /*
-  if (cur_kf->has_loop)
-  {
-    KeyFrame* connected_KF = getKeyFrame(cur_kf->loop_index);
-    Vector3d connected_P;
-    Matrix3d connected_R;
-    connected_KF->getPose(connected_P,  connected_R);
-    posegraph_visualization->add_loopedge(P, connected_P, SHIFT);
-  }
-  */
 
   keyframelist.push_back(cur_kf);
-  //publish();
+  // publish();
   m_keyframelist.unlock();
 }
 
@@ -321,18 +313,15 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
   }
 
   TicToc tmp_t;
-  //first query; then add this frame into database!
+  // first query; then add this frame into database!
   QueryResults ret;
   TicToc t_query;
   // 调用词袋查询接口，查询结果保存在ret中，最多返回4个备选的KF，查找距离当前至少50帧之前的KF
   db.query(keyframe->brief_descriptors, ret, 4, frame_index - 50);
-  //printf("query time: %f", t_query.toc());
-  //cout << "Searching for Image " << frame_index << ". " << ret << endl;
 
   TicToc t_add;
   db.add(keyframe->brief_descriptors); // 将当前帧加入到数据库中，便于后续的查询
-  //printf("add feature time: %f", t_add.toc());
-  // ret[0] is the nearest neighbour's score. threshold change with neighour score
+  
   bool find_loop = false;
   cv::Mat loop_result;
   if (DEBUG_IMAGE)
@@ -353,12 +342,12 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
       cv::hconcat(loop_result, tmp_image, loop_result);
     }
   }
+
   // a good match with its neighbour
   // ret按照得分大小排序，确保返回的候选KF数目至少一个满足要求
   if (!ret.empty() && ret[0].Score > 0.05)
     for (unsigned int i = 1; i < ret.size(); i++)
     {
-      //if (ret[i].Score > ret[0].Score * 0.3)
       // 如果有一个大于候选帧且得分大于阈值
       if (ret[i].Score > 0.015)
       {
@@ -372,15 +361,8 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
           cv::hconcat(loop_result, tmp_image, loop_result);
         }
       }
-
     }
-/*
-  if (DEBUG_IMAGE)
-  {
-      cv::imshow("loop_result", loop_result);
-      cv::waitKey(20);
-  }
-*/
+
   if (find_loop && frame_index > 50) // 找到了回环且距离当前帧至少50帧以后
   {
     int min_index = -1;
@@ -417,22 +399,23 @@ void PoseGraph::addKeyFrameIntoVoc(KeyFrame* keyframe)
  */
 void PoseGraph::optimize4DoF()
 {
-  while(true)
+  while (true)
   {
     int cur_index = -1;
     int first_looped_index = -1;
     m_optimize_buf.lock();
     // 取出最新的形成回环的当前帧
-    while(!optimize_buf.empty())
+    while (!optimize_buf.empty())
     {
       cur_index = optimize_buf.front();
       first_looped_index = earliest_loop_index; // 找到最早的回环帧
       optimize_buf.pop();
     }
     m_optimize_buf.unlock();
+
     if (cur_index != -1)
     {
-      printf("optimize pose graph \n");
+      printf("optimize pose graph.\n");
       TicToc tmp_t;
       m_keyframelist.lock();
       KeyFrame* cur_kf = getKeyFrame(cur_index); // 得到当前帧对应的的KF指针
@@ -449,13 +432,11 @@ void PoseGraph::optimize4DoF()
       ceres::Problem problem;
       ceres::Solver::Options options;
       options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
-      //options.minimizer_progress_to_stdout = true;
-      //options.max_solver_time_in_seconds = SOLVER_TIME * 3;
       options.max_num_iterations = 5;
       ceres::Solver::Summary summary;
       ceres::LossFunction* loss_function;
       loss_function = new ceres::HuberLoss(0.1);
-      //loss_function = new ceres::CauchyLoss(1.0);
+      // loss_function = new ceres::CauchyLoss(1.0);
       // 由于yaw角的周期性，所以需要定义一个local_parameterization
       ceres::LocalParameterization* angle_local_parameterization = AngleLocalParameterization::Create();
 
@@ -497,25 +478,25 @@ void PoseGraph::optimize4DoF()
           problem.SetParameterBlockConstant(t_array[i]);
         }
 
-        //add edge 建立约束，每一帧和之前5帧进行约束，找到这一帧前面5帧，并且需要他们是一个sequence的
+        // add edge 建立约束，每一帧和之前5帧进行约束，找到这一帧前面5帧，并且需要他们是一个sequence的
         for (int j = 1; j < 5; j++)
         {
-          if (i - j >= 0 && sequence_array[i] == sequence_array[i-j])
+          if (i - j >= 0 && sequence_array[i] == sequence_array[i - j])
           {
             // 计算T_i-j_w * T_w_i = T_i-j_i
-            Vector3d euler_conncected = Utility::R2ypr(q_array[i-j].toRotationMatrix());
-            Vector3d relative_t(t_array[i][0] - t_array[i-j][0], t_array[i][1] - t_array[i-j][1], t_array[i][2] - t_array[i-j][2]);
-            relative_t = q_array[i-j].inverse() * relative_t;
-            double relative_yaw = euler_array[i][0] - euler_array[i-j][0];
+            Vector3d euler_conncected = Utility::R2ypr(q_array[i - j].toRotationMatrix());
+            Vector3d relative_t(t_array[i][0] - t_array[i - j][0], t_array[i][1] - t_array[i - j][1], t_array[i][2] - t_array[i - j][2]);
+            relative_t = q_array[i - j].inverse() * relative_t; // 转换到i-j帧坐标系下
+            double relative_yaw = euler_array[i][0] - euler_array[i - j][0];
             ceres::CostFunction* cost_function = FourDOFError::Create(relative_t.x(), relative_t.y(), relative_t.z(),
-                                                                       relative_yaw, euler_conncected.y(), euler_conncected.z());
+                                                                      relative_yaw, euler_conncected.y(), euler_conncected.z());
             // 对i-j帧和i帧进行约束
-            problem.AddResidualBlock(cost_function, nullptr, euler_array[i-j],
-                                     t_array[i-j], euler_array[i], t_array[i]);
+            problem.AddResidualBlock(cost_function, nullptr, euler_array[i - j],
+                                     t_array[i - j], euler_array[i], t_array[i]);
           }
         }
 
-        //add loop edge
+        // add loop edge
         // 如果当前帧有回环，那么就和回环帧进行约束
         if((*it)->has_loop)
         {
@@ -532,21 +513,13 @@ void PoseGraph::optimize4DoF()
         }
 
         if ((*it)->index == cur_index) // 到当前帧了，不会再有添加了，结束
-            break;
+          break;
         i++;
       }
       m_keyframelist.unlock();
 
       ceres::Solve(options, &problem, &summary);
-      // std::cout << summary.BriefReport() << "\n";
 
-      // printf("pose optimization time: %f \n", tmp_t.toc());
-      /*
-      for (int j = 0 ; j < i; j++)
-      {
-        printf("optimize i: %d p: %f, %f, %f\n", j, t_array[j][0], t_array[j][1], t_array[j][2] );
-      }
-      */
       m_keyframelist.lock();
       i = 0;
       // 得到优化后的位姿恢复
@@ -570,14 +543,12 @@ void PoseGraph::optimize4DoF()
       cur_kf->getPose(cur_t, cur_r); // 最新优化后的位姿
       cur_kf->getVioPose(vio_t, vio_r); // VIO的位姿
       m_drift.lock();
+
       // 计算VIO位姿和优化位姿的偏差
       yaw_drift = Utility::R2ypr(cur_r).x() - Utility::R2ypr(vio_r).x();
       r_drift = Utility::ypr2R(Vector3d(yaw_drift, 0, 0));
       t_drift = cur_t - r_drift * vio_t;
       m_drift.unlock();
-      // cout << "t_drift " << t_drift.transpose() << endl;
-      // cout << "r_drift " << Utility::R2ypr(r_drift).transpose() << endl;
-      // cout << "yaw drift " << yaw_drift << endl;
 
       it++;
       // 遍历当前帧之后的所有帧，将他们的位姿都进行修正
@@ -595,124 +566,124 @@ void PoseGraph::optimize4DoF()
       updatePath();
     }
 
-      std::chrono::milliseconds dura(2000);
-      std::this_thread::sleep_for(dura);
+    std::chrono::milliseconds dura(2000);
+    std::this_thread::sleep_for(dura);
   }
 }
 
 void PoseGraph::updatePath()
 {
-    m_keyframelist.lock();
-    list<KeyFrame*>::iterator it;
-    for (int i = 1; i <= sequence_cnt; i++)
+  m_keyframelist.lock();
+  list<KeyFrame*>::iterator it;
+  for (int i = 1; i <= sequence_cnt; i++)
+  {
+    path[i].poses.clear();
+  }
+  base_path.poses.clear();
+  posegraph_visualization->reset();
+
+  if (SAVE_LOOP_PATH)
+  {
+    ofstream loop_path_file_tmp(VINS_RESULT_PATH, ios::out);
+    loop_path_file_tmp.close();
+  }
+
+  for (it = keyframelist.begin(); it != keyframelist.end(); it++)
+{
+    Vector3d P;
+    Matrix3d R;
+    (*it)->getPose(P, R);
+    Quaterniond Q;
+    Q = R;
+
+    geometry_msgs::PoseStamped pose_stamped;
+    pose_stamped.header.stamp = ros::Time((*it)->time_stamp);
+    pose_stamped.header.frame_id = "world";
+    pose_stamped.pose.position.x = P.x() + VISUALIZATION_SHIFT_X;
+    pose_stamped.pose.position.y = P.y() + VISUALIZATION_SHIFT_Y;
+    pose_stamped.pose.position.z = P.z();
+    pose_stamped.pose.orientation.x = Q.x();
+    pose_stamped.pose.orientation.y = Q.y();
+    pose_stamped.pose.orientation.z = Q.z();
+    pose_stamped.pose.orientation.w = Q.w();
+    if((*it)->sequence == 0)
     {
-        path[i].poses.clear();
+      base_path.poses.push_back(pose_stamped);
+      base_path.header = pose_stamped.header;
     }
-    base_path.poses.clear();
-    posegraph_visualization->reset();
+    else
+    {
+      path[(*it)->sequence].poses.push_back(pose_stamped);
+      path[(*it)->sequence].header = pose_stamped.header;
+    }
 
     if (SAVE_LOOP_PATH)
     {
-        ofstream loop_path_file_tmp(VINS_RESULT_PATH, ios::out);
-        loop_path_file_tmp.close();
+      ofstream loop_path_file(VINS_RESULT_PATH, ios::app);
+      loop_path_file.setf(ios::fixed, ios::floatfield);
+      loop_path_file.precision(0);
+      loop_path_file << (*it)->time_stamp * 1e9 << ",";
+      loop_path_file.precision(5);
+      loop_path_file << P.x() << ","
+                     << P.y() << ","
+                     << P.z() << ","
+                     << Q.w() << ","
+                     << Q.x() << ","
+                     << Q.y() << ","
+                     << Q.z() << ","
+                     << endl;
+      loop_path_file.close();
     }
 
-    for (it = keyframelist.begin(); it != keyframelist.end(); it++)
+    // draw local connection
+    if (SHOW_S_EDGE)
     {
-        Vector3d P;
-        Matrix3d R;
-        (*it)->getPose(P, R);
-        Quaterniond Q;
-        Q = R;
-//        printf("path p: %f, %f, %f\n",  P.x(),  P.z(),  P.y() );
-
-        geometry_msgs::PoseStamped pose_stamped;
-        pose_stamped.header.stamp = ros::Time((*it)->time_stamp);
-        pose_stamped.header.frame_id = "world";
-        pose_stamped.pose.position.x = P.x() + VISUALIZATION_SHIFT_X;
-        pose_stamped.pose.position.y = P.y() + VISUALIZATION_SHIFT_Y;
-        pose_stamped.pose.position.z = P.z();
-        pose_stamped.pose.orientation.x = Q.x();
-        pose_stamped.pose.orientation.y = Q.y();
-        pose_stamped.pose.orientation.z = Q.z();
-        pose_stamped.pose.orientation.w = Q.w();
-        if((*it)->sequence == 0)
+      list<KeyFrame*>::reverse_iterator rit = keyframelist.rbegin();
+      list<KeyFrame*>::reverse_iterator lrit;
+      for (; rit != keyframelist.rend(); rit++)  
+      {  
+        if ((*rit)->index == (*it)->index)
         {
-            base_path.poses.push_back(pose_stamped);
-            base_path.header = pose_stamped.header;
-        }
-        else
-        {
-            path[(*it)->sequence].poses.push_back(pose_stamped);
-            path[(*it)->sequence].header = pose_stamped.header;
-        }
-
-        if (SAVE_LOOP_PATH)
-        {
-            ofstream loop_path_file(VINS_RESULT_PATH, ios::app);
-            loop_path_file.setf(ios::fixed, ios::floatfield);
-            loop_path_file.precision(0);
-            loop_path_file << (*it)->time_stamp * 1e9 << ",";
-            loop_path_file.precision(5);
-            loop_path_file  << P.x() << ","
-                  << P.y() << ","
-                  << P.z() << ","
-                  << Q.w() << ","
-                  << Q.x() << ","
-                  << Q.y() << ","
-                  << Q.z() << ","
-                  << endl;
-            loop_path_file.close();
-        }
-        //draw local connection
-        if (SHOW_S_EDGE)
-        {
-            list<KeyFrame*>::reverse_iterator rit = keyframelist.rbegin();
-            list<KeyFrame*>::reverse_iterator lrit;
-            for (; rit != keyframelist.rend(); rit++)  
-            {  
-                if ((*rit)->index == (*it)->index)
-                {
-                    lrit = rit;
-                    lrit++;
-                    for (int i = 0; i < 4; i++)
-                    {
-                        if (lrit == keyframelist.rend())
-                            break;
-                        if((*lrit)->sequence == (*it)->sequence)
-                        {
-                            Vector3d conncected_P;
-                            Matrix3d connected_R;
-                            (*lrit)->getPose(conncected_P, connected_R);
-                            posegraph_visualization->add_edge(P, conncected_P);
-                        }
-                        lrit++;
-                    }
-                    break;
-                }
-            } 
-        }
-        if (SHOW_L_EDGE)
-        {
-            if ((*it)->has_loop && (*it)->sequence == sequence_cnt)
+          lrit = rit;
+          lrit++;
+          for (int i = 0; i < 4; i++)
+          {
+            if (lrit == keyframelist.rend())
+              break;
+            if ((*lrit)->sequence == (*it)->sequence)
             {
-                
-                KeyFrame* connected_KF = getKeyFrame((*it)->loop_index);
-                Vector3d connected_P;
-                Matrix3d connected_R;
-                connected_KF->getPose(connected_P, connected_R);
-                //(*it)->getVioPose(P, R);
-                (*it)->getPose(P, R);
-                if((*it)->sequence > 0)
-                {
-                    posegraph_visualization->add_loopedge(P, connected_P + Vector3d(VISUALIZATION_SHIFT_X, VISUALIZATION_SHIFT_Y, 0));
-                }
+              Vector3d conncected_P;
+              Matrix3d connected_R;
+              (*lrit)->getPose(conncected_P, connected_R);
+              posegraph_visualization->add_edge(P, conncected_P);
             }
+            lrit++;
+          }
+          break;
         }
-
+      } 
     }
-    publish();
-    m_keyframelist.unlock();
+
+    if (SHOW_L_EDGE)
+    {
+      if ((*it)->has_loop && (*it)->sequence == sequence_cnt)
+      {
+        KeyFrame* connected_KF = getKeyFrame((*it)->loop_index);
+        Vector3d connected_P;
+        Matrix3d connected_R;
+        connected_KF->getPose(connected_P, connected_R);
+        
+        (*it)->getPose(P, R);
+        if ((*it)->sequence > 0)
+        {
+          posegraph_visualization->add_loopedge(P, connected_P + Vector3d(VISUALIZATION_SHIFT_X, VISUALIZATION_SHIFT_Y, 0));
+        }
+      }
+    }
+
+  }
+  publish();
+  m_keyframelist.unlock();
 }
 
 
@@ -721,11 +692,11 @@ void PoseGraph::savePoseGraph()
   m_keyframelist.lock();
   TicToc tmp_t;
   FILE* pFile; // FILE是流对象的结构体，通常在文件和I/O流操作中使用
-  printf("pose graph path: %s\n",POSE_GRAPH_SAVE_PATH.c_str());
-  printf("pose graph saving... \n");
+  printf("pose graph path: %s\n", POSE_GRAPH_SAVE_PATH.c_str());
+  printf("pose graph saving...\n");
   string file_path = POSE_GRAPH_SAVE_PATH + "pose_graph.txt";
   pFile = fopen (file_path.c_str(),"w");
-  // fprintf(pFile, "index time_stamp Tx Ty Tz Qw Qx Qy Qz loop_index loop_info\n");
+  
   list<KeyFrame*>::iterator it;
   for (it = keyframelist.begin(); it != keyframelist.end(); it++)
   {
@@ -741,18 +712,18 @@ void PoseGraph::savePoseGraph()
     Vector3d VIO_tmp_T = (*it)->vio_T_w_i;
     Vector3d PG_tmp_T = (*it)->T_w_i;
 
-    fprintf (pFile, " %d %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %d %f %f %f %f %f %f %f %f %d\n",(*it)->index, (*it)->time_stamp,
-             VIO_tmp_T.x(), VIO_tmp_T.y(), VIO_tmp_T.z(), PG_tmp_T.x(), PG_tmp_T.y(), PG_tmp_T.z(),
-             VIO_tmp_Q.w(), VIO_tmp_Q.x(), VIO_tmp_Q.y(), VIO_tmp_Q.z(), PG_tmp_Q.w(), PG_tmp_Q.x(), PG_tmp_Q.y(), PG_tmp_Q.z(),
-             (*it)->loop_index, (*it)->loop_info(0), (*it)->loop_info(1), (*it)->loop_info(2), (*it)->loop_info(3),
-             (*it)->loop_info(4), (*it)->loop_info(5), (*it)->loop_info(6), (*it)->loop_info(7), (int)(*it)->keypoints.size());
+    fprintf(pFile, " %d %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %d %f %f %f %f %f %f %f %f %d\n",(*it)->index, (*it)->time_stamp,
+            VIO_tmp_T.x(), VIO_tmp_T.y(), VIO_tmp_T.z(), PG_tmp_T.x(), PG_tmp_T.y(), PG_tmp_T.z(),
+            VIO_tmp_Q.w(), VIO_tmp_Q.x(), VIO_tmp_Q.y(), VIO_tmp_Q.z(), PG_tmp_Q.w(), PG_tmp_Q.x(), PG_tmp_Q.y(), PG_tmp_Q.z(),
+            (*it)->loop_index, (*it)->loop_info(0), (*it)->loop_info(1), (*it)->loop_info(2), (*it)->loop_info(3),
+            (*it)->loop_info(4), (*it)->loop_info(5), (*it)->loop_info(6), (*it)->loop_info(7), (int)(*it)->keypoints.size());
 
     // write keypoints, brief_descriptors   vector<cv::KeyPoint> keypoints vector<BRIEF::bitset> brief_descriptors;
     assert((*it)->keypoints.size() == (*it)->brief_descriptors.size());
     brief_path = POSE_GRAPH_SAVE_PATH + to_string((*it)->index) + "_briefdes.dat";
     std::ofstream brief_file(brief_path, std::ios::binary);
     keypoints_path = POSE_GRAPH_SAVE_PATH + to_string((*it)->index) + "_keypoints.txt";
-    FILE *keypoints_file;
+    FILE* keypoints_file;
     keypoints_file = fopen(keypoints_path.c_str(), "w");
     for (int i = 0; i < (int)(*it)->keypoints.size(); i++)
     {
@@ -775,12 +746,12 @@ void PoseGraph::loadPoseGraph()
   TicToc tmp_t;
   FILE* pFile;
   string file_path = POSE_GRAPH_SAVE_PATH + "pose_graph.txt";
-  printf("lode pose graph from: %s \n", file_path.c_str());
+  printf("lode pose graph from: %s\n", file_path.c_str());
   printf("pose graph loading...\n");
   pFile = fopen (file_path.c_str(),"r");
   if (pFile == nullptr)
   {
-    printf("lode previous pose graph error: wrong previous pose graph path or no previous pose graph \n the system will start with new pose graph \n");
+    printf("lode previous pose graph error: wrong previous pose graph path or no previous pose graph \n the system will start with new pose graph.\n");
     return;
   }
   int index;
@@ -793,24 +764,13 @@ void PoseGraph::loadPoseGraph()
   double loop_info_4, loop_info_5, loop_info_6, loop_info_7;
   int loop_index;
   int keypoints_num;
-  Eigen::Matrix<double, 8, 1 > loop_info;
+  Eigen::Matrix<double, 8, 1> loop_info;
   int cnt = 0;
   while (fscanf(pFile,"%d %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %d %lf %lf %lf %lf %lf %lf %lf %lf %d",
                 &index, &time_stamp, &VIO_Tx, &VIO_Ty, &VIO_Tz, &PG_Tx, &PG_Ty, &PG_Tz, &VIO_Qw, &VIO_Qx, &VIO_Qy, &VIO_Qz,
                 &PG_Qw, &PG_Qx, &PG_Qy, &PG_Qz, &loop_index, &loop_info_0, &loop_info_1, &loop_info_2, &loop_info_3,
                 &loop_info_4, &loop_info_5, &loop_info_6, &loop_info_7, &keypoints_num) != EOF)
   {
-    /*
-    printf("I read: %d %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %d %lf %lf %lf %lf %lf %lf %lf %lf %d\n", index, time_stamp,
-                                VIO_Tx, VIO_Ty, VIO_Tz,
-                                PG_Tx, PG_Ty, PG_Tz,
-                                VIO_Qw, VIO_Qx, VIO_Qy, VIO_Qz,
-                                PG_Qw, PG_Qx, PG_Qy, PG_Qz,
-                                loop_index,
-                                loop_info_0, loop_info_1, loop_info_2, loop_info_3,
-                                loop_info_4, loop_info_5, loop_info_6, loop_info_7,
-                                keypoints_num);
-    */
     cv::Mat image;
     std::string image_path, descriptor_path;
     if (DEBUG_IMAGE)
@@ -834,7 +794,7 @@ void PoseGraph::loadPoseGraph()
     Matrix3d VIO_R, PG_R;
     VIO_R = VIO_Q.toRotationMatrix();
     PG_R = PG_Q.toRotationMatrix();
-    Eigen::Matrix<double, 8, 1 > loop_info;
+    Eigen::Matrix<double, 8, 1> loop_info;
     loop_info << loop_info_0, loop_info_1, loop_info_2, loop_info_3, loop_info_4, loop_info_5, loop_info_6, loop_info_7;
 
     if (loop_index != -1)
@@ -847,7 +807,7 @@ void PoseGraph::loadPoseGraph()
     string brief_path = POSE_GRAPH_SAVE_PATH + to_string(index) + "_briefdes.dat";
     std::ifstream brief_file(brief_path, std::ios::binary);
     string keypoints_path = POSE_GRAPH_SAVE_PATH + to_string(index) + "_keypoints.txt";
-    FILE *keypoints_file;
+    FILE* keypoints_file;
     keypoints_file = fopen(keypoints_path.c_str(), "r");
     vector<cv::KeyPoint> keypoints;
     vector<cv::KeyPoint> keypoints_norm;
@@ -860,7 +820,7 @@ void PoseGraph::loadPoseGraph()
       cv::KeyPoint tmp_keypoint;
       cv::KeyPoint tmp_keypoint_norm;
       double p_x, p_y, p_x_norm, p_y_norm;
-      if(!fscanf(keypoints_file,"%lf %lf %lf %lf", &p_x, &p_y, &p_x_norm, &p_y_norm))
+      if (!fscanf(keypoints_file,"%lf %lf %lf %lf", &p_x, &p_y, &p_x_norm, &p_y_norm))
         printf(" fail to load pose graph \n");
       tmp_keypoint.pt.x = (float)p_x;
       tmp_keypoint.pt.y = (float)p_y;
@@ -887,22 +847,20 @@ void PoseGraph::loadPoseGraph()
 
 void PoseGraph::publish()
 {
-    for (int i = 1; i <= sequence_cnt; i++)
+  for (int i = 1; i <= sequence_cnt; i++)
+  {
+    if (1 || i == base_sequence)
     {
-        //if (sequence_loop[i] == true || i == base_sequence)
-        if (1 || i == base_sequence)
-        {
-            pub_pg_path.publish(path[i]);
-            pub_path[i].publish(path[i]);
-            posegraph_visualization->publish_by(pub_pose_graph, path[sequence_cnt].header);
-        }
+      pub_pg_path.publish(path[i]);
+      pub_path[i].publish(path[i]);
+      posegraph_visualization->publish_by(pub_pose_graph, path[sequence_cnt].header);
     }
-    base_path.header.frame_id = "world";
-    pub_base_path.publish(base_path);
-    //posegraph_visualization->publish_by(pub_pose_graph, path[sequence_cnt].header);
+  }
+  base_path.header.frame_id = "world";
+  pub_base_path.publish(base_path);
 }
 
-void PoseGraph::updateKeyFrameLoop(int index, Eigen::Matrix<double, 8, 1 >& _loop_info)
+void PoseGraph::updateKeyFrameLoop(int index, Eigen::Matrix<double, 8, 1>& _loop_info)
 {
   KeyFrame* kf = getKeyFrame(index);
   kf->updateLoop(_loop_info); // 更新和回环帧的相对位姿

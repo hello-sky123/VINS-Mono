@@ -36,7 +36,7 @@ class KeyFrame
             vector<cv::Point3f>& _point_3d, vector<cv::Point2f>& _point_2d_uv, vector<cv::Point2f>& _point_2d_normal,
             vector<double>& _point_id, int _sequence);
    KeyFrame(double _time_stamp, int _index, Vector3d& _vio_T_w_i, Matrix3d& _vio_R_w_i, Vector3d& _T_w_i, Matrix3d& _R_w_i,
-            cv::Mat& _image, int _loop_index, Eigen::Matrix<double, 8, 1 >& _loop_info,
+            cv::Mat& _image, int _loop_index, Eigen::Matrix<double, 8, 1>& _loop_info,
             vector<cv::KeyPoint>& _keypoints, vector<cv::KeyPoint>& _keypoints_norm, vector<BRIEF::bitset>& _brief_descriptors);
    bool findConnection(KeyFrame* old_kf);
    void computeWindowBRIEFPoint();
@@ -44,8 +44,8 @@ class KeyFrame
    //void extractBrief();
    static int HammingDis(const BRIEF::bitset& a, const BRIEF::bitset& b);
    static bool searchInAera(const BRIEF::bitset& window_descriptor, const std::vector<BRIEF::bitset>& descriptors_old,
-                     const std::vector<cv::KeyPoint>& keypoints_old, const std::vector<cv::KeyPoint>& keypoints_old_norm,
-                     cv::Point2f& best_match, cv::Point2f& best_match_norm);
+                            const std::vector<cv::KeyPoint>& keypoints_old, const std::vector<cv::KeyPoint>& keypoints_old_norm,
+                            cv::Point2f& best_match, cv::Point2f& best_match_norm);
    void searchByBRIEFDes(std::vector<cv::Point2f>& matched_2d_old, std::vector<cv::Point2f>& matched_2d_old_norm,
                          std::vector<uchar>& status, const std::vector<BRIEF::bitset>& descriptors_old,
                          const std::vector<cv::KeyPoint>& keypoints_old, const std::vector<cv::KeyPoint>& keypoints_old_norm);
@@ -57,13 +57,11 @@ class KeyFrame
    void getPose(Eigen::Vector3d& _T_w_i, Eigen::Matrix3d& _R_w_i) const;
    void updatePose(const Eigen::Vector3d& _T_w_i, const Eigen::Matrix3d& _R_w_i);
    void updateVioPose(const Eigen::Vector3d& _T_w_i, const Eigen::Matrix3d& _R_w_i);
-   void updateLoop(Eigen::Matrix<double, 8, 1 >& _loop_info);
+   void updateLoop(Eigen::Matrix<double, 8, 1>& _loop_info);
 
    Eigen::Vector3d getLoopRelativeT();
    double getLoopRelativeYaw();
    Eigen::Quaterniond getLoopRelativeQ();
-
-
 
    double time_stamp;
    int index;
@@ -90,6 +88,6 @@ class KeyFrame
 
    bool has_loop;
    int loop_index;
-   Eigen::Matrix<double, 8, 1 > loop_info;
+   Eigen::Matrix<double, 8, 1> loop_info;
 };
 

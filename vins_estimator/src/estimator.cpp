@@ -2,7 +2,6 @@
 
 #include <utility>
 
-ofstream ofs("/home/zhang/vins_estimator.txt", ios::app);
 Estimator::Estimator(): f_manager{Rs}
 {
   ROS_INFO("init begins");
@@ -650,7 +649,7 @@ void Estimator::double2vector()
     td = para_Td[0][0];
 
   // relative info between two loop frame
-  if(relocalization_info) // 类似进行一个调整
+  if (relocalization_info) // 类似进行一个调整
   {
     Matrix3d relo_r;
     Vector3d relo_t;
@@ -674,45 +673,42 @@ bool Estimator::failureDetection()
   if (f_manager.last_track_num < 2) // 地图点数目是否足够
   {
     ROS_INFO(" little feature %d", f_manager.last_track_num);
-    //return true;
   }
+
   if (Bas[WINDOW_SIZE].norm() > 2.5) // 估计的加速度偏置是否过大
   {
     ROS_INFO(" big IMU acc bias estimation %f", Bas[WINDOW_SIZE].norm());
     return true;
   }
+
   if (Bgs[WINDOW_SIZE].norm() > 1.0) // 估计的陀螺仪偏置是否过大
   {
     ROS_INFO(" big IMU gyr bias estimation %f", Bgs[WINDOW_SIZE].norm());
     return true;
   }
-  /*
-  if (tic(0) > 1)
-  {
-      ROS_INFO(" big extra param estimation %d", tic(0) > 1);
-      return true;
-  }
-  */
+  
   Vector3d tmp_P = Ps[WINDOW_SIZE];
   if ((tmp_P - last_P).norm() > 5) // 两帧之间的运动是否过大
   {
     ROS_INFO(" big translation");
     return true;
   }
+
   if (abs(tmp_P.z() - last_P.z()) > 1) // z方向的运动是否过大
   {
     ROS_INFO(" big z translation");
     return true;
   }
+
   Matrix3d tmp_R = Rs[WINDOW_SIZE];
   Matrix3d delta_R = tmp_R.transpose() * last_R;
   Quaterniond delta_Q(delta_R);
   double delta_angle;
   delta_angle = acos(delta_Q.w()) * 2.0 / 3.14 * 180.0;
+
   if (delta_angle > 50) // 两帧之间的旋转是否过大
   {
     ROS_INFO(" big delta_angle ");
-    //return true;
   }
   return false;
 }
@@ -825,9 +821,8 @@ void Estimator::optimization()
   ROS_DEBUG("prepare for ceres: %f", t_prepare.toc());
 
   // 回环检测的约束
-  if(relocalization_info)
+  if (relocalization_info)
   {
-    //printf("set relocalization factor! \n");
     ceres::LocalParameterization* local_parameterization = new PoseLocalParameterization();
     problem.AddParameterBlock(relo_Pose, SIZE_POSE, local_parameterization); // 优化变量是重定位帧的位姿
     int retrive_feature_index = 0;
@@ -840,15 +835,15 @@ void Estimator::optimization()
         continue;
       ++feature_index;
       int start = it_per_id.start_frame;
-      if(start <= relo_frame_local_index) // 这个地图点被对应的当前帧看到
+      if (start <= relo_frame_local_index) // 这个地图点被对应的当前帧看到
       {
         // 寻找回环可以看到的地图点
-        while((int)match_points[retrive_feature_index].z() < it_per_id.feature_id)
+        while ((int)match_points[retrive_feature_index].z() < it_per_id.feature_id) // .z()是特征点id
         {
           retrive_feature_index++;
         }
         // 这个地图点也可以被回环帧看到
-        if((int)match_points[retrive_feature_index].z() == it_per_id.feature_id)
+        if ((int)match_points[retrive_feature_index].z() == it_per_id.feature_id)
         {
           // 构造重定位的重投影约束，约束的是当前帧和回环帧
           Vector3d pts_j = Vector3d(match_points[retrive_feature_index].x(), match_points[retrive_feature_index].y(), 1.0);
@@ -860,13 +855,12 @@ void Estimator::optimization()
         }
       }
     }
-
   }
 
   ceres::Solver::Options options;
 
   options.linear_solver_type = ceres::DENSE_SCHUR;
-  //options.num_threads = 2;
+  // options.num_threads = 2;
   options.trust_region_strategy_type = ceres::DOGLEG;
   options.max_num_iterations = NUM_ITERATIONS;
   if (marginalization_flag == MARGIN_OLD)
@@ -1211,9 +1205,9 @@ void Estimator::setReloFrame(double _frame_stamp, int _frame_index, vector<Vecto
   match_points = _match_points;
   prev_relo_t = std::move(_relo_t);
   prev_relo_r = std::move(_relo_r);
-  for(int i = 0; i < WINDOW_SIZE; i++)
+  for (int i = 0; i < WINDOW_SIZE; i++)
   {
-    if(relo_frame_stamp == Headers[i].stamp.toSec())
+    if (relo_frame_stamp == Headers[i].stamp.toSec())
     {
       relo_frame_local_index = i; // 回环帧在滑窗中的位置
       relocalization_info = true; // 有效回环帧

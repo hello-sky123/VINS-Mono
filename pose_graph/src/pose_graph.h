@@ -77,7 +77,7 @@ class PoseGraph
    int earliest_loop_index;
    int base_sequence;
 
-   BriefDatabase db;
+   BriefDatabase db; // 词袋数据库
    BriefVocabulary* voc;
 
    ros::Publisher pub_pg_path;
@@ -169,7 +169,7 @@ struct FourDOFError
 
     // euler to rotation
     T w_R_i[9];
-    YawPitchRollToRotationMatrix(yaw_i[0], T(pitch_i), T(roll_i), w_R_i);
+    YawPitchRollToRotationMatrix(yaw_i[0], T(pitch_i), T(roll_i), w_R_i); // yaw使用了i帧的yaw
     // rotation transpose
     T i_R_w[9];
     RotationMatrixTranspose(w_R_i, i_R_w);
@@ -191,7 +191,7 @@ struct FourDOFError
                                      const double relative_yaw, const double pitch_i, const double roll_i)
   {
     return (new ceres::AutoDiffCostFunction<FourDOFError, 4, 1, 3, 1, 3>(
-            new FourDOFError(t_x, t_y, t_z, relative_yaw, pitch_i, roll_i)));
+                new FourDOFError(t_x, t_y, t_z, relative_yaw, pitch_i, roll_i)));
   }
 
   double t_x, t_y, t_z;
@@ -237,7 +237,7 @@ struct FourDOFWeightError
                                      const double relative_yaw, const double pitch_i, const double roll_i)
   {
     return (new ceres::AutoDiffCostFunction<FourDOFWeightError, 4, 1, 3, 1, 3>(
-            new FourDOFWeightError(t_x, t_y, t_z, relative_yaw, pitch_i, roll_i)));
+                new FourDOFWeightError(t_x, t_y, t_z, relative_yaw, pitch_i, roll_i)));
   }
 
   double t_x, t_y, t_z;

@@ -89,13 +89,14 @@ const cv::Mat& Camera::mask() const {
   return m_mask;
 }
 
+// 估计相机外参与相机模型无关，因此在基类中实现
 void Camera::estimateExtrinsics(const std::vector<cv::Point3f>& objectPoints,
                                 const std::vector<cv::Point2f>& imagePoints,
                                 cv::Mat& rvec, cv::Mat& tvec) const {
-  std::vector<cv::Point2f> Ms(imagePoints.size()); //归一化平面上的点
+  std::vector<cv::Point2f> Ms(imagePoints.size()); //像素坐标
   for (size_t i = 0; i < Ms.size(); ++i) {
     Eigen::Vector3d P;  // std::vector提供了两种方法来访问元素：operator[] 和 at()。operator[] 不检查索引是否有效，而 at() 会检查索引是否有效。
-    liftProjective(Eigen::Vector2d(imagePoints.at(i).x, imagePoints.at(i).y), P);
+    liftProjective(Eigen::Vector2d(imagePoints.at(i).x, imagePoints.at(i).y), P); // 反向投影得到归一化平面坐标，并去除畸变
     // liftProjective反向投影，将像素坐标转换为空间中对应点的坐标（lift提升）
     P /= P(2);
 
@@ -104,8 +105,8 @@ void Camera::estimateExtrinsics(const std::vector<cv::Point3f>& objectPoints,
   }
 
   // assume unit focal length, zero principal point, and zero distortion
-  // empty()是Mat类的成员函数，用来判断当前对象是否为空（没有行或者列），如果为空返回true，否则返回false，solvePnP默然使用的是迭代法求解
-  cv::solvePnP(objectPoints, Ms, cv::Mat::eye(3, 3, CV_64F), cv::noArray(), rvec, tvec);
+  // empty()是Mat类的成员函数，用来判断当前对象是否为空（没有行或者列），如果为空返回true，否则返回false，solvePnP默认使用的是迭代法求解
+  cv::solvePnP(objectPoints, Ms, cv::Mat::eye(3, 3, CV_64F), cv::noArray(), rvec, tvec); // Tcw
 }
 
 double Camera::reprojectionDist(const Eigen::Vector3d& P1, const Eigen::Vector3d& P2) const {
@@ -170,42 +171,40 @@ Camera::reprojectionError(const Eigen::Vector3d& P,
     return (p - observed_p).norm();
 }
 
-void
-Camera::projectPoints(const std::vector<cv::Point3f>& objectPoints,
-                      const cv::Mat& rvec,
-                      const cv::Mat& tvec,
-                      std::vector<cv::Point2f>& imagePoints) const
+void Camera::projectPoints(const std::vector<cv::Point3f>& objectPoints,
+                           const cv::Mat& rvec, const cv::Mat& tvec,
+                           std::vector<cv::Point2f>& imagePoints) const
 {
-    // project 3D object points to the image plane
-    imagePoints.reserve(objectPoints.size());
+  // project 3D object points to the image plane
+  imagePoints.reserve(objectPoints.size());
 
-    //double
-    cv::Mat R0;
-    cv::Rodrigues(rvec, R0);
+  // double
+  cv::Mat R0;
+  cv::Rodrigues(rvec, R0);
 
-    Eigen::MatrixXd R(3,3);
-    R << R0.at<double>(0,0), R0.at<double>(0,1), R0.at<double>(0,2),
-         R0.at<double>(1,0), R0.at<double>(1,1), R0.at<double>(1,2),
-         R0.at<double>(2,0), R0.at<double>(2,1), R0.at<double>(2,2);
+  Eigen::MatrixXd R(3,3);
+  R << R0.at<double>(0,0), R0.at<double>(0,1), R0.at<double>(0,2),
+       R0.at<double>(1,0), R0.at<double>(1,1), R0.at<double>(1,2),
+       R0.at<double>(2,0), R0.at<double>(2,1), R0.at<double>(2,2);
 
-    Eigen::Vector3d t;
-    t << tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2);
+  Eigen::Vector3d t;
+  t << tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2);
 
-    for (size_t i = 0; i < objectPoints.size(); ++i)
-    {
-        const cv::Point3f& objectPoint = objectPoints.at(i);
+  for (size_t i = 0; i < objectPoints.size(); ++i)
+  {
+    const cv::Point3f& objectPoint = objectPoints.at(i);
 
-        // Rotate and translate
-        Eigen::Vector3d P;
-        P << objectPoint.x, objectPoint.y, objectPoint.z;
+    // Rotate and translate
+    Eigen::Vector3d P;
+    P << objectPoint.x, objectPoint.y, objectPoint.z;
 
-        P = R * P + t;
+    P = R * P + t;
 
-        Eigen::Vector2d p;
-        spaceToPlane(P, p);
+    Eigen::Vector2d p;
+    spaceToPlane(P, p);
 
-        imagePoints.push_back(cv::Point2f(p(0), p(1)));
-    }
+    imagePoints.push_back(cv::Point2f(p(0), p(1)));
+  }
 }
 
 }

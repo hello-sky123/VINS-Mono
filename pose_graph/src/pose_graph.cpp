@@ -231,7 +231,7 @@ void PoseGraph::loadKeyFrame(KeyFrame* cur_kf, bool flag_detect_loop)
   }
   if (loop_index != -1)
   {
-    printf(" %d detect loop with %d \n", cur_kf->index, loop_index);
+    printf("%d detect loop with %d \n", cur_kf->index, loop_index);
     KeyFrame* old_kf = getKeyFrame(loop_index);
     if (cur_kf->findConnection(old_kf))
     {
@@ -415,7 +415,7 @@ void PoseGraph::optimize4DoF()
 
     if (cur_index != -1)
     {
-      printf("optimize pose graph.\n");
+      printf("optimize pose graph... \n");
       TicToc tmp_t;
       m_keyframelist.lock();
       KeyFrame* cur_kf = getKeyFrame(cur_index); // 得到当前帧对应的的KF指针
@@ -821,7 +821,7 @@ void PoseGraph::loadPoseGraph()
       cv::KeyPoint tmp_keypoint_norm;
       double p_x, p_y, p_x_norm, p_y_norm;
       if (!fscanf(keypoints_file,"%lf %lf %lf %lf", &p_x, &p_y, &p_x_norm, &p_y_norm))
-        printf(" fail to load pose graph \n");
+        printf("fail to load pose graph!\n");
       tmp_keypoint.pt.x = (float)p_x;
       tmp_keypoint.pt.y = (float)p_y;
       tmp_keypoint_norm.pt.x = (float)p_x_norm;
@@ -841,7 +841,7 @@ void PoseGraph::loadPoseGraph()
     cnt++;
   }
   fclose (pFile);
-  printf("load pose graph time: %f s\n", tmp_t.toc() / 1000);
+  printf("load pose graph time: %f s \n", tmp_t.toc() / 1000);
   base_sequence = 0;
 }
 

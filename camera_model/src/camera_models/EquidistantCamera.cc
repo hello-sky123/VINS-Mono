@@ -254,11 +254,11 @@ void EquidistantCamera::estimateIntrinsics(const cv::Size& boardSize,
   double f0 = 0.0;
   for (size_t i = 0; i < imagePoints.size(); ++i) {
     std::vector<Eigen::Vector2d> center(boardSize.height);
-    double radius[boardSize.height]; // boardSize是棋盘格的行列数
+    double radius[boardSize.height];
     for (int r = 0; r < boardSize.height; ++r) {
       std::vector<cv::Point2d> circle;
       for (int c = 0; c < boardSize.width; ++c) {
-        circle.push_back(imagePoints.at(i).at(r * boardSize.width + c));
+        circle.push_back(imagePoints.at(i).at(r * boardSize.width + c)); // 每一行上的角点
       }
 
       fitCircle(circle, center[r](0), center[r](1), radius[r]);
@@ -269,6 +269,7 @@ void EquidistantCamera::estimateIntrinsics(const cv::Size& boardSize,
         // find distance between pairs of vanishing points which
         // correspond to intersection points of 2 circles
         std::vector<cv::Point2d> ipts;
+        // 计算两个圆的交点
         ipts = intersectCircles(center[j](0), center[j](1), radius[j],
                                 center[k](0), center[k](1), radius[k]);
 
@@ -334,9 +335,9 @@ void EquidistantCamera::liftProjective(const Eigen::Vector2d& p, Eigen::Vector3d
 
   // Obtain a projective ray
   double theta, phi;
-  backprojectSymmetric(p_u, theta, phi);
+  backprojectSymmetric(p_u, theta, phi); // 反向投影得到归一化坐标
 
-  P(0) = sin(theta) * cos(phi);
+  P(0) = sin(theta) * cos(phi); // 单位球面坐标
   P(1) = sin(theta) * sin(phi);
   P(2) = cos(theta);
 }
@@ -383,25 +384,7 @@ void EquidistantCamera::spaceToPlane(const Eigen::Vector3d& P, Eigen::Vector2d& 
  * \return image point coordinates
  */
 void EquidistantCamera::undistToPlane(const Eigen::Vector2d& p_u, Eigen::Vector2d& p) const
-{
-//  Eigen::Vector2d p_d;
-//
-//  if (m_noDistortion)
-//  {
-//      p_d = p_u;
-//  }
-//  else
-//  {
-//      // Apply distortion
-//      Eigen::Vector2d d_u;
-//      distortion(p_u, d_u);
-//      p_d = p_u + d_u;
-//  }
-//
-//  // Apply generalised projection matrix
-//  p << mParameters.gamma1() * p_d(0) + mParameters.u0(),
-//       mParameters.gamma2() * p_d(1) + mParameters.v0();
-}
+{ }
 
 void EquidistantCamera::initUndistortMap(cv::Mat& map1, cv::Mat& map2, double fScale) const {
   cv::Size imageSize(mParameters.imageWidth(), mParameters.imageHeight());
@@ -486,11 +469,11 @@ cv::Mat EquidistantCamera::initUndistortRectifyMap(cv::Mat& map1, cv::Mat& map2,
   return K_rect_cv;
 }
 
-int EquidistantCamera::parameterCount(void) const {
+int EquidistantCamera::parameterCount() const {
   return 8;
 }
 
-const EquidistantCamera::Parameters& EquidistantCamera::getParameters(void) const {
+const EquidistantCamera::Parameters& EquidistantCamera::getParameters() const {
   return mParameters;
 }
 
@@ -569,6 +552,13 @@ void EquidistantCamera::fitOddPoly(const std::vector<double>& x, const std::vect
   }
 }
 
+/**
+ * \brief 由像素坐标反投影得到归一化坐标
+ *
+ * \param p pixel coordinates
+ * \param theta return value, polar angle
+ * \param phi return value, azimuthal angle
+ */
 void EquidistantCamera::backprojectSymmetric(const Eigen::Vector2d& p_u, double& theta, double& phi) const {
   double tol = 1e-10;
   double p_u_norm = p_u.norm();
@@ -621,10 +611,10 @@ void EquidistantCamera::backprojectSymmetric(const Eigen::Vector2d& p_u, double&
     Eigen::MatrixXd A(npow, npow);
     A.setZero();
     A.block(1, 0, npow - 1, npow - 1).setIdentity();
-    A.col(npow - 1) = - coeffs.block(0, 0, npow, 1) / coeffs(npow);
+    A.col(npow - 1) = - coeffs.block(0, 0, npow, 1) / coeffs(npow); // 最高幂次为1
 
     Eigen::EigenSolver<Eigen::MatrixXd> es(A); // EigenSolver是求解一般矩阵的特征值和特征向量的类
-    Eigen::MatrixXcd eigval = es.eigenvalues();
+    Eigen::MatrixXcd eigval = es.eigenvalues(); // 是一个列向量，每个元素是一个复数
 
     std::vector<double> thetas;
     for (int i = 0; i < eigval.rows(); ++i) {
@@ -649,7 +639,7 @@ void EquidistantCamera::backprojectSymmetric(const Eigen::Vector2d& p_u, double&
     }
     else
     {
-      theta = *std::min_element(thetas.begin(), thetas.end());
+      theta = *std::min_element(thetas.begin(), thetas.end()); // 返回最小元素的迭代器
     }
   }
 }

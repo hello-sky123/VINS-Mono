@@ -68,7 +68,7 @@ double last_image_time = -1;
 
 void new_sequence()
 {
-  printf("new sequence\n");
+  printf("new sequence!\n");
   sequence++;
   printf("sequence cnt %d \n", sequence);
   if (sequence > 5)
@@ -301,12 +301,12 @@ void process()
       if (image_buf.front()->header.stamp.toSec() > pose_buf.front()->header.stamp.toSec())
       {
         pose_buf.pop();
-        printf("throw pose at beginning\n");
+        printf("throw pose at beginning!\n");
       }
       else if (image_buf.front()->header.stamp.toSec() > point_buf.front()->header.stamp.toSec())
       {
         point_buf.pop();
-        printf("throw point at beginning\n");
+        printf("throw point at beginning!\n");
       }
 
       // 下面根据pose时间戳找时间戳同步的原图和地图点
@@ -437,7 +437,7 @@ void command()
       m_process.lock();
       posegraph.savePoseGraph();
       m_process.unlock();
-      printf("save pose graph finish\nyou can set 'load_previous_pose_graph' to 1 in the config file to reuse it next time\n");
+      printf("save pose graph finish. \n you can set 'load_previous_pose_graph' to 1 in the config file to reuse it next time. \n");
     }
     if (c == 'n') // n是新建一个sequence（一个新的地图）
       new_sequence();
@@ -480,11 +480,11 @@ int main(int argc, char **argv)
     COL = fsSettings["image_width"];
     std::string pkg_path = ros::package::getPath("pose_graph"); // 获取包路径
     string vocabulary_file = pkg_path + "/../support_files/brief_k10L6.bin"; // 训练好的二进制词袋路径
-    cout << "vocabulary_file" << vocabulary_file << endl;
+    cout << "vocabulary_file: " << vocabulary_file << endl;
     posegraph.loadVocabulary(vocabulary_file); // 加载词袋
 
     BRIEF_PATTERN_FILE = pkg_path + "/../support_files/brief_pattern.yml"; // BRIEF描述子的点对选取模式
-    cout << "BRIEF_PATTERN_FILE" << BRIEF_PATTERN_FILE << endl;
+    cout << "BRIEF_PATTERN_FILE: " << BRIEF_PATTERN_FILE << endl;
     m_camera = camodocal::CameraFactory::instance()->generateCameraFromYamlFile(config_file);
 
     fsSettings["image_topic"] >> IMAGE_TOPIC;
@@ -506,11 +506,11 @@ int main(int argc, char **argv)
 
     if (LOAD_PREVIOUS_POSE_GRAPH)
     {
-      printf("load pose graph\n");
+      printf("load pose graph... \n");
       m_process.lock();
       posegraph.loadPoseGraph();
       m_process.unlock();
-      printf("load pose graph finish\n");
+      printf("load pose graph finish. \n");
       load_flag = true;
     }
     else

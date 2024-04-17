@@ -83,20 +83,20 @@ bool CameraCalibration::calibrate()
 
     for (size_t j = 0; j < m_imagePoints.at(i).size(); ++j)
     {
-        cv::Point2f pObs = m_imagePoints.at(i).at(j);
-        cv::Point2f pEst = estImagePoints.at(j);
+      cv::Point2f pObs = m_imagePoints.at(i).at(j);
+      cv::Point2f pEst = estImagePoints.at(j);
 
-        cv::Point2f err = pObs - pEst;
+      cv::Point2f err = pObs - pEst;
 
-        errVec.at(i).push_back(err);
+      errVec.at(i).push_back(err);
 
-        errSum += Eigen::Vector2d(err.x, err.y);
+      errSum += Eigen::Vector2d(err.x, err.y);
     }
 
     errCount += m_imagePoints.at(i).size();
   }
 
-  Eigen::Vector2d errMean = errSum / static_cast<double>(errCount);
+  Eigen::Vector2d errMean = errSum / static_cast<double>(errCount); // 计算误差均值（所有图像）
 
   Eigen::Matrix2d measurementCovariance = Eigen::Matrix2d::Zero();
   for (size_t i = 0; i < errVec.size(); ++i)
@@ -125,17 +125,17 @@ int CameraCalibration::sampleCount() const
   return (int)m_imagePoints.size();
 }
 
-std::vector<std::vector<cv::Point2f> >& CameraCalibration::imagePoints()
+std::vector<std::vector<cv::Point2f>>& CameraCalibration::imagePoints()
 {
   return m_imagePoints;
 }
 
-const std::vector<std::vector<cv::Point2f> >& CameraCalibration::imagePoints() const
+const std::vector<std::vector<cv::Point2f>>& CameraCalibration::imagePoints() const
 {
   return m_imagePoints;
 }
 
-std::vector<std::vector<cv::Point3f> >& CameraCalibration::scenePoints()
+std::vector<std::vector<cv::Point3f>>& CameraCalibration::scenePoints()
 {
   return m_scenePoints;
 }
@@ -240,13 +240,13 @@ void CameraCalibration::drawResults(std::vector<cv::Mat>& images) const
       }
     }
 
-      std::ostringstream oss;
-      oss << "Reprojection error: avg = " << errorSum / (float)m_imagePoints.at(i).size()
-          << "   max = " << errorMax;
+    std::ostringstream oss;
+    oss << "Reprojection error: avg = " << errorSum / (float)m_imagePoints.at(i).size()
+        << "   max = " << errorMax;
 
-      cv::putText(image, oss.str(), cv::Point(10, image.rows - 10),
-                  cv::FONT_HERSHEY_COMPLEX, 0.5, cv::Scalar(255, 255, 255),
-                  1, CV_AA);
+    cv::putText(image, oss.str(), cv::Point(10, image.rows - 10),
+                cv::FONT_HERSHEY_COMPLEX, 0.5, cv::Scalar(255, 255, 255),
+                1, CV_AA);
   }
 }
 
@@ -279,15 +279,15 @@ bool CameraCalibration::writeChessboardData(const std::string& filename) const
   {
     for (int j = 0; j < m_cameraPoses.cols; ++j)
     {
-      writeData(ofs, m_cameraPoses.at<double>(i,j));
+      writeData(ofs, m_cameraPoses.at<double>(i, j));
     }
   }
 
   writeData(ofs, m_imagePoints.size());
-  for (const auto & m_imagePoint : m_imagePoints)
+  for (const auto & m_imagePoint: m_imagePoints)
   {
     writeData(ofs, m_imagePoint.size());
-    for (const auto & ipt : m_imagePoint)
+    for (const auto & ipt: m_imagePoint)
     {
       writeData(ofs, ipt.x);
       writeData(ofs, ipt.y);
@@ -295,10 +295,10 @@ bool CameraCalibration::writeChessboardData(const std::string& filename) const
   }
 
   writeData(ofs, m_scenePoints.size());
-  for (const auto & m_scenePoint : m_scenePoints)
+  for (const auto & m_scenePoint: m_scenePoints)
   {
     writeData(ofs, m_scenePoint.size());
-    for (const auto & spt : m_scenePoint)
+    for (const auto & spt: m_scenePoint)
     {
       writeData(ofs, spt.x);
       writeData(ofs, spt.y);
@@ -321,10 +321,10 @@ bool CameraCalibration::readChessboardData(const std::string& filename)
   readData(ifs, m_boardSize.height);
   readData(ifs, m_squareSize);
 
-  readData(ifs, m_measurementCovariance(0,0));
-  readData(ifs, m_measurementCovariance(0,1));
-  readData(ifs, m_measurementCovariance(1,0));
-  readData(ifs, m_measurementCovariance(1,1));
+  readData(ifs, m_measurementCovariance(0, 0));
+  readData(ifs, m_measurementCovariance(0, 1));
+  readData(ifs, m_measurementCovariance(1, 0));
+  readData(ifs, m_measurementCovariance(1, 1));
 
   int rows, cols, type;
   readData(ifs, rows);
@@ -336,7 +336,7 @@ bool CameraCalibration::readChessboardData(const std::string& filename)
   {
     for (int j = 0; j < m_cameraPoses.cols; ++j)
     {
-      readData(ifs, m_cameraPoses.at<double>(i,j));
+      readData(ifs, m_cameraPoses.at<double>(i, j));
     }
   }
 
@@ -345,13 +345,13 @@ bool CameraCalibration::readChessboardData(const std::string& filename)
 
   m_imagePoints.clear();
   m_imagePoints.resize(nImagePointSets);
-  for (auto & m_imagePoint : m_imagePoints)
+  for (auto & m_imagePoint: m_imagePoints)
   {
     size_t nImagePoints;
     readData(ifs, nImagePoints);
     m_imagePoint.resize(nImagePoints);
 
-    for (auto & ipt : m_imagePoint)
+    for (auto & ipt: m_imagePoint)
     {
       readData(ifs, ipt.x);
       readData(ifs, ipt.y);
@@ -363,13 +363,13 @@ bool CameraCalibration::readChessboardData(const std::string& filename)
 
   m_scenePoints.clear();
   m_scenePoints.resize(nScenePointSets);
-  for (auto & m_scenePoint : m_scenePoints)
+  for (auto & m_scenePoint: m_scenePoints)
   {
     size_t nScenePoints;
     readData(ifs, nScenePoints);
     m_scenePoint.resize(nScenePoints);
 
-    for (auto & spt : m_scenePoint)
+    for (auto & spt: m_scenePoint)
     {
       readData(ifs, spt.x);
       readData(ifs, spt.y);
@@ -390,10 +390,10 @@ bool CameraCalibration::calibrateHelper(CameraPtr& camera, std::vector<cv::Mat>&
   rvecs.assign(m_scenePoints.size(), cv::Mat()); // assign()方法用于给vector赋值
   tvecs.assign(m_scenePoints.size(), cv::Mat()); // 有3种重载形式，使用范围赋值，使用初始化列表赋值，使用n个相同值赋值
 
-  // STEP 1: Estimate intrinsics
+  // STEP 1: Estimate intrinsics（主要是求出f初值）
   camera->estimateIntrinsics(m_boardSize, m_scenePoints, m_imagePoints);
 
-  // STEP 2: Estimate extrinsics
+  // STEP 2: Estimate extrinsics（得到初步的外参）
   for (size_t i = 0; i < m_scenePoints.size(); ++i)
   {
     camera->estimateExtrinsics(m_scenePoints.at(i), m_imagePoints.at(i), rvecs.at(i), tvecs.at(i));
@@ -409,15 +409,15 @@ bool CameraCalibration::calibrateHelper(CameraPtr& camera, std::vector<cv::Mat>&
   }
 
   // STEP 3: optimization using ceres
-  optimize(camera, rvecs, tvecs);
+  optimize(camera, rvecs, tvecs); // 创建一个优化问题
 
   if (m_verbose)
   {
-      double err = camera->reprojectionError(m_scenePoints, m_imagePoints, rvecs, tvecs);
-      std::cout << "[" << camera->cameraName() << "] " << "# INFO: Final reprojection error: "
-                << err << " pixels" << std::endl;
-      std::cout << "[" << camera->cameraName() << "] " << "# INFO: "
-                << camera->parametersToString() << std::endl;
+    double err = camera->reprojectionError(m_scenePoints, m_imagePoints, rvecs, tvecs);
+    std::cout << "[" << camera->cameraName() << "] " << "# INFO: Final reprojection error: "
+              << err << " pixels" << std::endl;
+    std::cout << "[" << camera->cameraName() << "] " << "# INFO: "
+              << camera->parametersToString() << std::endl;
   }
 
   return true;
@@ -429,6 +429,7 @@ void CameraCalibration::optimize(CameraPtr& camera, std::vector<cv::Mat>& rvecs,
   ceres::Problem problem; // 定义优化问题
 
   std::vector<Transform, Eigen::aligned_allocator<Transform>> transformVec(rvecs.size());
+  // 将cv格式的外参转换为Eigen格式，并将旋转矩阵和平移向量合并到一个Transform对象中
   for (size_t i = 0; i < rvecs.size(); ++i)
   {
     Eigen::Vector3d rvec;
@@ -441,7 +442,7 @@ void CameraCalibration::optimize(CameraPtr& camera, std::vector<cv::Mat>& rvecs,
   }
 
   std::vector<double> intrinsicCameraParams;
-  m_camera->writeParameters(intrinsicCameraParams);
+  m_camera->writeParameters(intrinsicCameraParams); // 将相机内参写入intrinsicCameraParams，顺序为k1, k2, p1, p2, fx, fy, cx, cy
 
   // create residuals for each observation
   for (size_t i = 0; i < m_imagePoints.size(); ++i)
@@ -452,8 +453,7 @@ void CameraCalibration::optimize(CameraPtr& camera, std::vector<cv::Mat>& rvecs,
       const cv::Point2f& ipt = m_imagePoints.at(i).at(j);
 
       ceres::CostFunction* costFunction =
-          CostFunctionFactory::instance()->generateCostFunction(camera,
-                                                                Eigen::Vector3d(spt.x, spt.y, spt.z),
+          CostFunctionFactory::instance()->generateCostFunction(camera,Eigen::Vector3d(spt.x, spt.y, spt.z),
                                                                 Eigen::Vector2d(ipt.x, ipt.y),
                                                                 CAMERA_INTRINSICS | CAMERA_POSE);
 
@@ -483,7 +483,7 @@ void CameraCalibration::optimize(CameraPtr& camera, std::vector<cv::Mat>& rvecs,
   }
 
   ceres::Solver::Summary summary;
-  ceres::Solve(options, &problem, &summary);
+  ceres::Solve(options, &problem,  &summary);
   std::cout << "end ceres" << std::endl;
 
   if (m_verbose)

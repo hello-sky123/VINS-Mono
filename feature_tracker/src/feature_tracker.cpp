@@ -264,7 +264,6 @@ void FeatureTracker::showUndistortion(const string& name)
       m_camera->liftProjective(a, b);
       distortedp.push_back(a);
       undistortedp.emplace_back(b.x() / b.z(), b.y() / b.z());
-      //printf("%f,%f->%f,%f,%f\n)\n", a.x(), a.y(), b.x(), b.y(), b.z());
     }
   }
 
@@ -274,16 +273,10 @@ void FeatureTracker::showUndistortion(const string& name)
     pp.at<float>(0, 0) = float(undistortedp[i].x() * FOCAL_LENGTH) + (float)COL / 2;
     pp.at<float>(1, 0) = float(undistortedp[i].y() * FOCAL_LENGTH) + (float)ROW / 2;
     pp.at<float>(2, 0) = 1.0;
-    //cout << trackerData[0].K << endl;
-    //printf("%lf %lf\n", p.at<float>(1, 0), p.at<float>(0, 0));
-    //printf("%lf %lf\n", pp.at<float>(1, 0), pp.at<float>(0, 0));
+    
     if (pp.at<float>(1, 0) + 300 >= 0 && pp.at<float>(1, 0) + 300 < (float)ROW + 600 && pp.at<float>(0, 0) + 300 >= 0 && pp.at<float>(0, 0) + 300 < (float)COL + 600)
     {
       undistortedImg.at<uchar>((int)pp.at<float>(1, 0) + 300, (int)pp.at<float>(0, 0) + 300) = cur_img.at<uchar>((int)distortedp[i].y(), (int)distortedp[i].x());
-    }
-    else
-    {
-        //ROS_ERROR("(%f %f) -> (%f %f)", distorted p[i].y, distorted p[i].x, pp.at<float>(1, 0), pp.at<float>(0, 0));
     }
   }
   cv::imshow(name, undistortedImg);

@@ -19,15 +19,15 @@ class InitialEXRotation
  private:
    static Matrix3d solveRelativeR(const vector<pair<Vector3d, Vector3d>>& corres);
 
-   static double testTriangulation(const vector<cv::Point2f>& l,const vector<cv::Point2f>& r,
+   static double testTriangulation(const vector<cv::Point2f>& l, const vector<cv::Point2f>& r,
                                   cv::Mat_<double> R, cv::Mat_<double> t);
    static void decomposeE(const cv::Mat& E, cv::Mat_<double>& R1, cv::Mat_<double>& R2,
                           cv::Mat_<double>& t1, cv::Mat_<double>& t2);
    int frame_count;
 
-   vector< Matrix3d > Rc;
-   vector< Matrix3d > Rimu;
-   vector< Matrix3d > Rc_g;
+   vector<Matrix3d> Rc;
+   vector<Matrix3d> Rimu;
+   vector<Matrix3d> Rc_g;
    Matrix3d ric;
 };
 

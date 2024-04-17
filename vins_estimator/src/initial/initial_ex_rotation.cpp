@@ -14,7 +14,7 @@ bool InitialEXRotation::CalibrationExRotation(const vector<pair<Vector3d, Vector
   // 根据特征点关联信息，求解两个连续帧之间的相对旋转
   Rc.push_back(solveRelativeR(corres));
   Rimu.push_back(delta_q_imu.toRotationMatrix());
-  // 通过外参把imu坐标系下的旋转转换到相机坐标系下
+  // R_{bk}{bk+1} * Ric = Ric * R_{ck}{ck+1}
   Rc_g.emplace_back(ric.inverse() * delta_q_imu * ric); // ric是上一次求解得到的外参
 
   Eigen::MatrixXd A(frame_count * 4, 4); // 4N x 4的矩阵
@@ -28,9 +28,9 @@ bool InitialEXRotation::CalibrationExRotation(const vector<pair<Vector3d, Vector
     double angular_distance = 180 / M_PI * r1.angularDistance(r2); // 两个旋转之间的角度差（rad）
     ROS_DEBUG("%d %f", i, angular_distance);
 
-    double huber = angular_distance > 5.0 ? 5.0 / angular_distance: 1.0;
+    double huber = angular_distance > 5.0 ? 5.0 / angular_distance: 1.0; // huber惩罚函数
     ++sum_ok;
-    Matrix4d L, R;
+    Matrix4d L, R; // 四元数的左乘和右乘矩阵
 
     double w = Quaterniond(Rc[i]).w();
     Vector3d q = Quaterniond(Rc[i]).vec();
@@ -47,15 +47,14 @@ bool InitialEXRotation::CalibrationExRotation(const vector<pair<Vector3d, Vector
     R.block<1, 3>(3, 0) = -q.transpose();
     R(3, 3) = w;
 
-    A.block<4, 4>((i - 1) * 4, 0) = huber * (L - R);
+    A.block<4, 4>((i - 1) * 4, 0) = huber * (L - R); // (L(R_{bk}{bk+1}) - R(R_{ck}{ck+1}))Ric = 0
   }
 
   JacobiSVD<MatrixXd> svd(A, ComputeFullU | ComputeFullV);
   Matrix<double, 4, 1> x = svd.matrixV().col(3);
   Quaterniond estimated_R(x);
   ric = estimated_R.toRotationMatrix().inverse();
-  //cout << svd.singularValues().transpose() << endl;
-  //cout << ric << endl;
+
   Vector3d ric_cov;
   ric_cov = svd.singularValues().tail<3>(); // 取后三个奇异值
   // 因为旋转是3个自由度，因此检查第三个奇异值是否大于0.25（通常需要足够的运动激励才能保证得到没有奇异的解），同时检查是否已经达到了滑窗大小
@@ -75,18 +74,19 @@ Matrix3d InitialEXRotation::solveRelativeR(const vector<pair<Vector3d, Vector3d>
     vector<cv::Point2f> ll, rr;
     for (const auto& corre: corres)
     {
-        ll.emplace_back(corre.first(0), corre.first(1));
-        rr.emplace_back(corre.second(0), corre.second(1));
+      ll.emplace_back(corre.first(0), corre.first(1));
+      rr.emplace_back(corre.second(0), corre.second(1));
     }
-    cv::Mat E = cv::findFundamentalMat(ll, rr);
+    cv::Mat E = cv::findFundamentalMat(ll, rr); // 对极约束，得到T21
     cv::Mat_<double> R1, R2, t1, t2; // 它是cv::Mat的一个封装。它允许在编译时确定矩阵的数据类型
-    decomposeE(E, R1, R2, t1, t2);
+    decomposeE(E, R1, R2, t1, t2); // SVD分解得到可能的4种解
 
     if (determinant(R1) + 1.0 < 1e-09)
     {
       E = -E;
       decomposeE(E, R1, R2, t1, t2);
     }
+
     // 比较正深度的比例
     double ratio1 = max(testTriangulation(ll, rr, R1, t1), testTriangulation(ll, rr, R1, t2));
     double ratio2 = max(testTriangulation(ll, rr, R2, t1), testTriangulation(ll, rr, R2, t2));

@@ -15,7 +15,7 @@ class CameraCalibration
    CameraCalibration();
 
    CameraCalibration(Camera::ModelType modelType, const std::string& cameraName, const cv::Size& imageSize,
-                     cv::Size  boardSize, float squareSize);
+                     cv::Size boardSize, float squareSize); 
 
    void clear();
 
@@ -24,10 +24,10 @@ class CameraCalibration
    bool calibrate();
 
    int sampleCount() const;
-   std::vector<std::vector<cv::Point2f> >& imagePoints();
-   const std::vector<std::vector<cv::Point2f> >& imagePoints() const;
-   std::vector<std::vector<cv::Point3f> >& scenePoints();
-   const std::vector<std::vector<cv::Point3f> >& scenePoints() const;
+   std::vector<std::vector<cv::Point2f>>& imagePoints();
+   const std::vector<std::vector<cv::Point2f>>& imagePoints() const;
+   std::vector<std::vector<cv::Point3f>>& scenePoints();
+   const std::vector<std::vector<cv::Point3f>>& scenePoints() const;
    CameraPtr& camera();
    CameraConstPtr camera() const;
 
@@ -57,14 +57,14 @@ class CameraCalibration
    template<typename T>
    void writeData(std::ofstream& ofs, T data) const;
 
-   cv::Size m_boardSize;
-   float m_squareSize;
+   cv::Size m_boardSize; // 棋盘格的尺寸
+   float m_squareSize; // 单个小棋盘格的面积
 
-   CameraPtr m_camera;
+   CameraPtr m_camera; // 指向相机模型基类的指针
    cv::Mat m_cameraPoses;
 
-   std::vector<std::vector<cv::Point2f> > m_imagePoints;
-   std::vector<std::vector<cv::Point3f> > m_scenePoints;
+   std::vector<std::vector<cv::Point2f>> m_imagePoints; // 标定使用的图像数据的角点，每个元素存了一张图像的角点
+   std::vector<std::vector<cv::Point3f>> m_scenePoints;
 
    Eigen::Matrix2d m_measurementCovariance;
 

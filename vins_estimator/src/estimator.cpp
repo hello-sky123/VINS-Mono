@@ -151,7 +151,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
 
   // 没有外参初值
   // step2: 外参初始化
-  if(ESTIMATE_EXTRINSIC == 2)
+  if (ESTIMATE_EXTRINSIC == 2)
   {
     ROS_INFO("calibrating extrinsic param, rotation movement is needed");
     if (frame_count != 0)

@@ -69,7 +69,7 @@ class ReprojectionError1 {
 
    // variables: camera intrinsics and camera extrinsics
    template <typename T>
-   bool operator()(const T* const intrinsic_params, const T* const q, const T* const t,T* residuals) const {
+   bool operator()(const T* const intrinsic_params, const T* const q, const T* const t, T* residuals) const {
      Eigen::Matrix<T, 3, 1> P = m_observed_P.cast<T>();
 
      Eigen::Matrix<T, 2, 1> predicted_p;
@@ -422,7 +422,7 @@ CostFunctionFactory::instance() {
 }
 
 ceres::CostFunction* CostFunctionFactory::generateCostFunction(const CameraConstPtr& camera, const Eigen::Vector3d& observed_P,
-                                          const Eigen::Vector2d& observed_p, int flags) {
+                                                               const Eigen::Vector2d& observed_p, int flags) {
   ceres::CostFunction* costFunction = nullptr;
 
   std::vector<double> intrinsic_params;
@@ -455,35 +455,35 @@ ceres::CostFunction* CostFunctionFactory::generateCostFunction(const CameraConst
       }
       break;
     }
-  case CAMERA_ODOMETRY_TRANSFORM | ODOMETRY_6D_POSE:
-    switch (camera->modelType()) {
-    case Camera::KANNALA_BRANDT:
-      costFunction =
-          new ceres::AutoDiffCostFunction<ReprojectionError1<EquidistantCamera>, 2, 4, 3, 3, 3>(
-          new ReprojectionError1<EquidistantCamera>(intrinsic_params, observed_P, observed_p));
+    case CAMERA_ODOMETRY_TRANSFORM | ODOMETRY_6D_POSE:
+      switch (camera->modelType()) {
+      case Camera::KANNALA_BRANDT:
+        costFunction =
+            new ceres::AutoDiffCostFunction<ReprojectionError1<EquidistantCamera>, 2, 4, 3, 3, 3>(
+            new ReprojectionError1<EquidistantCamera>(intrinsic_params, observed_P, observed_p));
+        break;
+      case Camera::PINHOLE:
+        costFunction =
+            new ceres::AutoDiffCostFunction<ReprojectionError1<PinholeCamera>, 2, 4, 3, 3, 3>(
+            new ReprojectionError1<PinholeCamera>(intrinsic_params, observed_P, observed_p));
+        break;
+      case Camera::MEI:
+        costFunction =
+            new ceres::AutoDiffCostFunction<ReprojectionError1<CataCamera>, 2, 4, 3, 3, 3>(
+            new ReprojectionError1<CataCamera>(intrinsic_params, observed_P, observed_p));
+        break;
+      case Camera::SCARAMUZZA:
+        costFunction =
+            new ceres::AutoDiffCostFunction<ReprojectionError1<OCAMCamera>, 2, 4, 3, 3, 3>(
+            new ReprojectionError1<OCAMCamera>(intrinsic_params, observed_P, observed_p));
+        break;
+      }
       break;
-    case Camera::PINHOLE:
-      costFunction =
-          new ceres::AutoDiffCostFunction<ReprojectionError1<PinholeCamera>, 2, 4, 3, 3, 3>(
-          new ReprojectionError1<PinholeCamera>(intrinsic_params, observed_P, observed_p));
-      break;
-    case Camera::MEI:
-      costFunction =
-          new ceres::AutoDiffCostFunction<ReprojectionError1<CataCamera>, 2, 4, 3, 3, 3>(
-          new ReprojectionError1<CataCamera>(intrinsic_params, observed_P, observed_p));
-      break;
-    case Camera::SCARAMUZZA:
-      costFunction =
-          new ceres::AutoDiffCostFunction<ReprojectionError1<OCAMCamera>, 2, 4, 3, 3, 3>(
-          new ReprojectionError1<OCAMCamera>(intrinsic_params, observed_P, observed_p));
-      break;
-    }
-    break;
 
-    default:
-      std::cout << "CostFunctionFactory::generateCostFunction: Unknown flags" << std::endl;
-      break;
-  }
+      default:
+        std::cout << "CostFunctionFactory::generateCostFunction: Unknown flags" << std::endl;
+        break;
+    }
 
   return costFunction;
 }

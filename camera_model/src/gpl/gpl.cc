@@ -648,6 +648,7 @@ void fitCircle(const std::vector<cv::Point2d>& points, double& centerX, double& 
     sum_yyy += y * y * y;
   }
 
+  // Modified Least Squares Methods
   double A = n * sum_xx - square(sum_x);
   double B = n * sum_xy - sum_x * sum_y;
   double C = n * sum_yy - square(sum_y);
@@ -665,7 +666,7 @@ void fitCircle(const std::vector<cv::Point2d>& points, double& centerX, double& 
     sum_r += hypot(x - centerX, y - centerY); // sqrt((x - centerX)^2 + (y - centerY)^2)计算直角三角形的斜边长度
   }
 
-  radius = sum_r / n;
+  radius = sum_r / n; // 计算平均半径
 }
 
 // https://lucidar.me/en/mathematics/how-to-calculate-the-intersection-points-of-two-circles/

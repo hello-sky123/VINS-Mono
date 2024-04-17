@@ -284,19 +284,25 @@ void PinholeCamera::estimateIntrinsics(const cv::Size& boardSize,
     std::vector<cv::Point2f> M(oPoints.size());
     for (size_t j = 0; j < M.size(); ++j)
     {
-        M.at(j) = cv::Point2f(oPoints.at(j).x, oPoints.at(j).y);
+      M.at(j) = cv::Point2f(oPoints.at(j).x, oPoints.at(j).y); // 棋盘格上的角点的物理坐标，z为0
     }
 
-    cv::Mat H = cv::findHomography(M, imagePoints.at(i));
+    cv::Mat H = cv::findHomography(M, imagePoints.at(i)); // 求出该图像的单应矩阵
 
-    H.at<double>(0,0) -= H.at<double>(2,0) * cx;
+    // H = A[r1 r2 t] = [alpha * r11 + u0 * r13, alpha * r21 + u0 * r23, alpha * t1 + u0 * t3
+    //                   beta * r12 + v0 * r13, beta * r22 + v0 * r23, beta * t2 + v0 * t3
+    //                   r13, r23, t3]
+    H.at<double>(0,0) -= H.at<double>(2,0) * cx; // 消去u0
     H.at<double>(0,1) -= H.at<double>(2,1) * cx;
     H.at<double>(0,2) -= H.at<double>(2,2) * cx;
     H.at<double>(1,0) -= H.at<double>(2,0) * cy;
     H.at<double>(1,1) -= H.at<double>(2,1) * cy;
     H.at<double>(1,2) -= H.at<double>(2,2) * cy;
+    // 经过上面操作，H = [alpha * r11, alpha * r21, alpha * t1
+    //                   beta * r12, beta * r22, beta * t2
+    //                   r13, r23, t3]
 
-    double h[3], v[3], d1[3], d2[3];
+    double h[3], v[3], d1[3], d2[3]; // 修改形式，H = [h, v, j], d1 = (h + v) / 2, d2 = (h - v) / 2
     double n[4] = {0,0,0,0};
 
     for (int j = 0; j < 3; ++j) {
@@ -313,11 +319,15 @@ void PinholeCamera::estimateIntrinsics(const cv::Size& boardSize,
       j = 1.0 / sqrt(j);
     }
 
+    // 将这4个值归一化
     for (int j = 0; j < 3; ++j) {
       h[j] *= n[0]; v[j] *= n[1];
       d1[j] *= n[2]; d2[j] *= n[3];
     }
 
+    // 简化形式下，需要求解的是alpha和beta，因此可以对H进行一些操作，来构建只包含B11和B22的方程
+    // [h[0]v[0], h[1]v[1]] * [1 / alpha^2, 1 / beta^2]^T = -h[2]v[2]
+    // [d1[0]d2[0], d1[1]d2[1]] * [1 / alpha^2, 1 / beta^2]^T = -d1[2]d2[2]
     A.at<double>(i * 2, 0) = h[0] * v[0];
     A.at<double>(i * 2, 1) = h[1] * v[1];
     A.at<double>(i * 2 + 1, 0) = d1[0] * d2[0];
@@ -397,24 +407,24 @@ void PinholeCamera::liftProjective(const Eigen::Vector2d& p, Eigen::Vector3d& P)
  */
 void PinholeCamera::spaceToPlane(const Eigen::Vector3d& P, Eigen::Vector2d& p) const
 {
-    Eigen::Vector2d p_u, p_d;
+  Eigen::Vector2d p_u, p_d;
 
-    // Project points to the normalised plane
-    p_u << P(0) / P(2), P(1) / P(2);
+  // Project points to the normalised plane
+  p_u << P(0) / P(2), P(1) / P(2);
 
-    if (m_noDistortion) {
-      p_d = p_u;
-    }
-    else {
-      // Apply distortion
-      Eigen::Vector2d d_u;
-      distortion(p_u, d_u);
-      p_d = p_u + d_u;
-    }
+  if (m_noDistortion) {
+    p_d = p_u;
+  }
+  else {
+    // Apply distortion
+    Eigen::Vector2d d_u;
+    distortion(p_u, d_u);
+    p_d = p_u + d_u;
+  }
 
-    // Apply generalised projection matrix
-    p << mParameters.fx() * p_d(0) + mParameters.cx(),
-         mParameters.fy() * p_d(1) + mParameters.cy();
+  // Apply generalised projection matrix
+  p << mParameters.fx() * p_d(0) + mParameters.cx(),
+       mParameters.fy() * p_d(1) + mParameters.cy();
 }
 
 /**

@@ -28,6 +28,7 @@ KeyFrame::KeyFrame(double _time_stamp, int _index, Vector3d& _vio_T_w_i, Matrix3
 		               vector<cv::Point3f>& _point_3d, vector<cv::Point2f>& _point_2d_uv, vector<cv::Point2f>& _point_2d_norm,
 		               vector<double>& _point_id, int _sequence)
 {
+<<<<<<< HEAD
   time_stamp = _time_stamp;
   index = _index;
   vio_T_w_i = _vio_T_w_i;
@@ -51,6 +52,31 @@ KeyFrame::KeyFrame(double _time_stamp, int _index, Vector3d& _vio_T_w_i, Matrix3
   computeBRIEFPoint(); // 额外提取fast角点并计算BRIEF描述子
   if (!DEBUG_IMAGE)
     image.release();
+=======
+	time_stamp = _time_stamp;
+	index = _index;
+	vio_T_w_i = _vio_T_w_i;
+	vio_R_w_i = _vio_R_w_i;
+	T_w_i = vio_T_w_i;
+	R_w_i = vio_R_w_i;
+	origin_vio_T = vio_T_w_i;
+	origin_vio_R = vio_R_w_i;
+	image = _image.clone();
+	cv::resize(image, thumbnail, cv::Size(80, 60));
+	point_3d = _point_3d;
+	point_2d_uv = _point_2d_uv;
+	point_2d_norm = _point_2d_norm;
+	point_id = _point_id;
+	has_loop = false;
+	loop_index = -1;
+	has_fast_point = false;
+	loop_info << 0, 0, 0, 0, 0, 0, 0, 0;
+	sequence = _sequence;
+	computeWindowBRIEFPoint();
+	computeBRIEFPoint();
+	if(!DEBUG_IMAGE)
+		image.release();
+>>>>>>> 90dabb5ec79946ae42fd2e1e91d4e69aabe1e25d
 }
 
 // load previous keyframe
@@ -455,6 +481,7 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
         putText(notation, "previous frame: " + to_string(old_kf->index) + "  sequence: " + to_string(old_kf->sequence), cv::Point2f(float(20 + COL + gap), 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
         cv::vconcat(notation, loop_match_img, loop_match_img);
 
+<<<<<<< HEAD
         if ((int)matched_2d_cur.size() > MIN_LOOP_NUM)
         {
           /*
@@ -518,6 +545,269 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
     }
   }
   return false;
+=======
+bool KeyFrame::findConnection(KeyFrame* old_kf)
+{
+	TicToc tmp_t;
+	//printf("find Connection\n");
+	vector<cv::Point2f> matched_2d_cur, matched_2d_old;
+	vector<cv::Point2f> matched_2d_cur_norm, matched_2d_old_norm;
+	vector<cv::Point3f> matched_3d;
+	vector<double> matched_id;
+	vector<uchar> status;
+
+	matched_3d = point_3d;
+	matched_2d_cur = point_2d_uv;
+	matched_2d_cur_norm = point_2d_norm;
+	matched_id = point_id;
+
+	TicToc t_match;
+	#if 0
+		if (DEBUG_IMAGE)
+	    {
+	        cv::Mat gray_img, loop_match_img;
+	        cv::Mat old_img = old_kf->image;
+	        cv::hconcat(image, old_img, gray_img);
+	        cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
+	        for(int i = 0; i< (int)point_2d_uv.size(); i++)
+	        {
+	            cv::Point2f cur_pt = point_2d_uv[i];
+	            cv::circle(loop_match_img, cur_pt, 5, cv::Scalar(0, 255, 0));
+	        }
+	        for(int i = 0; i< (int)old_kf->keypoints.size(); i++)
+	        {
+	            cv::Point2f old_pt = old_kf->keypoints[i].pt;
+	            old_pt.x += COL;
+	            cv::circle(loop_match_img, old_pt, 5, cv::Scalar(0, 255, 0));
+	        }
+	        ostringstream path;
+	        path << "/home/tony-ws1/raw_data/loop_image/"
+	                << index << "-"
+	                << old_kf->index << "-" << "0raw_point.jpg";
+	        cv::imwrite( path.str().c_str(), loop_match_img);
+	    }
+	#endif
+	//printf("search by des\n");
+	searchByBRIEFDes(matched_2d_old, matched_2d_old_norm, status, old_kf->brief_descriptors, old_kf->keypoints, old_kf->keypoints_norm);
+	reduceVector(matched_2d_cur, status);
+	reduceVector(matched_2d_old, status);
+	reduceVector(matched_2d_cur_norm, status);
+	reduceVector(matched_2d_old_norm, status);
+	reduceVector(matched_3d, status);
+	reduceVector(matched_id, status);
+	//printf("search by des finish\n");
+
+	#if 0
+		if (DEBUG_IMAGE)
+	    {
+			int gap = 10;
+        	cv::Mat gap_image(ROW, gap, CV_8UC1, cv::Scalar(255, 255, 255));
+            cv::Mat gray_img, loop_match_img;
+            cv::Mat old_img = old_kf->image;
+            cv::hconcat(image, gap_image, gap_image);
+            cv::hconcat(gap_image, old_img, gray_img);
+            cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
+	        for(int i = 0; i< (int)matched_2d_cur.size(); i++)
+	        {
+	            cv::Point2f cur_pt = matched_2d_cur[i];
+	            cv::circle(loop_match_img, cur_pt, 5, cv::Scalar(0, 255, 0));
+	        }
+	        for(int i = 0; i< (int)matched_2d_old.size(); i++)
+	        {
+	            cv::Point2f old_pt = matched_2d_old[i];
+	            old_pt.x += (COL + gap);
+	            cv::circle(loop_match_img, old_pt, 5, cv::Scalar(0, 255, 0));
+	        }
+	        for (int i = 0; i< (int)matched_2d_cur.size(); i++)
+	        {
+	            cv::Point2f old_pt = matched_2d_old[i];
+	            old_pt.x +=  (COL + gap);
+	            cv::line(loop_match_img, matched_2d_cur[i], old_pt, cv::Scalar(0, 255, 0), 1, 8, 0);
+	        }
+
+	        ostringstream path, path1, path2;
+	        path <<  "/home/tony-ws1/raw_data/loop_image/"
+	                << index << "-"
+	                << old_kf->index << "-" << "1descriptor_match.jpg";
+	        cv::imwrite( path.str().c_str(), loop_match_img);
+	        /*
+	        path1 <<  "/home/tony-ws1/raw_data/loop_image/"
+	                << index << "-"
+	                << old_kf->index << "-" << "1descriptor_match_1.jpg";
+	        cv::imwrite( path1.str().c_str(), image);
+	        path2 <<  "/home/tony-ws1/raw_data/loop_image/"
+	                << index << "-"
+	                << old_kf->index << "-" << "1descriptor_match_2.jpg";
+	        cv::imwrite( path2.str().c_str(), old_img);
+	        */
+
+	    }
+	#endif
+	status.clear();
+	/*
+	FundmantalMatrixRANSAC(matched_2d_cur_norm, matched_2d_old_norm, status);
+	reduceVector(matched_2d_cur, status);
+	reduceVector(matched_2d_old, status);
+	reduceVector(matched_2d_cur_norm, status);
+	reduceVector(matched_2d_old_norm, status);
+	reduceVector(matched_3d, status);
+	reduceVector(matched_id, status);
+	*/
+	#if 0
+		if (DEBUG_IMAGE)
+	    {
+			int gap = 10;
+        	cv::Mat gap_image(ROW, gap, CV_8UC1, cv::Scalar(255, 255, 255));
+            cv::Mat gray_img, loop_match_img;
+            cv::Mat old_img = old_kf->image;
+            cv::hconcat(image, gap_image, gap_image);
+            cv::hconcat(gap_image, old_img, gray_img);
+            cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
+	        for(int i = 0; i< (int)matched_2d_cur.size(); i++)
+	        {
+	            cv::Point2f cur_pt = matched_2d_cur[i];
+	            cv::circle(loop_match_img, cur_pt, 5, cv::Scalar(0, 255, 0));
+	        }
+	        for(int i = 0; i< (int)matched_2d_old.size(); i++)
+	        {
+	            cv::Point2f old_pt = matched_2d_old[i];
+	            old_pt.x += (COL + gap);
+	            cv::circle(loop_match_img, old_pt, 5, cv::Scalar(0, 255, 0));
+	        }
+	        for (int i = 0; i< (int)matched_2d_cur.size(); i++)
+	        {
+	            cv::Point2f old_pt = matched_2d_old[i];
+	            old_pt.x +=  (COL + gap) ;
+	            cv::line(loop_match_img, matched_2d_cur[i], old_pt, cv::Scalar(0, 255, 0), 1, 8, 0);
+	        }
+
+	        ostringstream path;
+	        path <<  "/home/tony-ws1/raw_data/loop_image/"
+	                << index << "-"
+	                << old_kf->index << "-" << "2fundamental_match.jpg";
+	        cv::imwrite( path.str().c_str(), loop_match_img);
+	    }
+	#endif
+	Eigen::Vector3d PnP_T_old;
+	Eigen::Matrix3d PnP_R_old;
+	Eigen::Vector3d relative_t;
+	Quaterniond relative_q;
+	double relative_yaw;
+	if ((int)matched_2d_cur.size() > MIN_LOOP_NUM)
+	{
+		status.clear();
+	    PnPRANSAC(matched_2d_old_norm, matched_3d, status, PnP_T_old, PnP_R_old);
+	    reduceVector(matched_2d_cur, status);
+	    reduceVector(matched_2d_old, status);
+	    reduceVector(matched_2d_cur_norm, status);
+	    reduceVector(matched_2d_old_norm, status);
+	    reduceVector(matched_3d, status);
+	    reduceVector(matched_id, status);
+	    #if 1
+	    	if (DEBUG_IMAGE)
+	        {
+	        	int gap = 10;
+	        	cv::Mat gap_image(ROW, gap, CV_8UC1, cv::Scalar(255, 255, 255));
+	            cv::Mat gray_img, loop_match_img;
+	            cv::Mat old_img = old_kf->image;
+	            cv::hconcat(image, gap_image, gap_image);
+	            cv::hconcat(gap_image, old_img, gray_img);
+	            cvtColor(gray_img, loop_match_img, CV_GRAY2RGB);
+	            for(int i = 0; i< (int)matched_2d_cur.size(); i++)
+	            {
+	                cv::Point2f cur_pt = matched_2d_cur[i];
+	                cv::circle(loop_match_img, cur_pt, 5, cv::Scalar(0, 255, 0));
+	            }
+	            for(int i = 0; i< (int)matched_2d_old.size(); i++)
+	            {
+	                cv::Point2f old_pt = matched_2d_old[i];
+	                old_pt.x += (COL + gap);
+	                cv::circle(loop_match_img, old_pt, 5, cv::Scalar(0, 255, 0));
+	            }
+	            for (int i = 0; i< (int)matched_2d_cur.size(); i++)
+	            {
+	                cv::Point2f old_pt = matched_2d_old[i];
+	                old_pt.x += (COL + gap) ;
+	                cv::line(loop_match_img, matched_2d_cur[i], old_pt, cv::Scalar(0, 255, 0), 2, 8, 0);
+	            }
+	            cv::Mat notation(50, COL + gap + COL, CV_8UC3, cv::Scalar(255, 255, 255));
+	            putText(notation, "current frame: " + to_string(index) + "  sequence: " + to_string(sequence), cv::Point2f(20, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+
+	            putText(notation, "previous frame: " + to_string(old_kf->index) + "  sequence: " + to_string(old_kf->sequence), cv::Point2f(20 + COL + gap, 30), cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255), 3);
+	            cv::vconcat(notation, loop_match_img, loop_match_img);
+
+	            /*
+	            ostringstream path;
+	            path <<  "/home/tony-ws1/raw_data/loop_image/"
+	                    << index << "-"
+	                    << old_kf->index << "-" << "3pnp_match.jpg";
+	            cv::imwrite( path.str().c_str(), loop_match_img);
+	            */
+	            if ((int)matched_2d_cur.size() > MIN_LOOP_NUM)
+	            {
+	            	/*
+	            	cv::imshow("loop connection",loop_match_img);
+	            	cv::waitKey(10);
+	            	*/
+	            	cv::Mat thumbimage;
+	            	cv::resize(loop_match_img, thumbimage, cv::Size(loop_match_img.cols / 2, loop_match_img.rows / 2));
+	    	    	sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", thumbimage).toImageMsg();
+	                msg->header.stamp = ros::Time(time_stamp);
+	    	    	pub_match_img.publish(msg);
+	            }
+	        }
+	    #endif
+	}
+
+	if ((int)matched_2d_cur.size() > MIN_LOOP_NUM)
+	{
+	    relative_t = PnP_R_old.transpose() * (origin_vio_T - PnP_T_old);
+	    relative_q = PnP_R_old.transpose() * origin_vio_R;
+	    relative_yaw = Utility::normalizeAngle(Utility::R2ypr(origin_vio_R).x() - Utility::R2ypr(PnP_R_old).x());
+	    //printf("PNP relative\n");
+	    //cout << "pnp relative_t " << relative_t.transpose() << endl;
+	    //cout << "pnp relative_yaw " << relative_yaw << endl;
+	    if (abs(relative_yaw) < 30.0 && relative_t.norm() < 20.0)
+	    {
+
+	    	has_loop = true;
+	    	loop_index = old_kf->index;
+	    	loop_info << relative_t.x(), relative_t.y(), relative_t.z(),
+	    	             relative_q.w(), relative_q.x(), relative_q.y(), relative_q.z(),
+	    	             relative_yaw;
+	    	if(FAST_RELOCALIZATION)
+	    	{
+			    sensor_msgs::PointCloud msg_match_points;
+			    msg_match_points.header.stamp = ros::Time(time_stamp);
+			    for (int i = 0; i < (int)matched_2d_old_norm.size(); i++)
+			    {
+		            geometry_msgs::Point32 p;
+		            p.x = matched_2d_old_norm[i].x;
+		            p.y = matched_2d_old_norm[i].y;
+		            p.z = matched_id[i];
+		            msg_match_points.points.push_back(p);
+			    }
+			    Eigen::Vector3d T = old_kf->T_w_i;
+			    Eigen::Matrix3d R = old_kf->R_w_i;
+			    Quaterniond Q(R);
+			    sensor_msgs::ChannelFloat32 t_q_index;
+			    t_q_index.values.push_back(T.x());
+			    t_q_index.values.push_back(T.y());
+			    t_q_index.values.push_back(T.z());
+			    t_q_index.values.push_back(Q.w());
+			    t_q_index.values.push_back(Q.x());
+			    t_q_index.values.push_back(Q.y());
+			    t_q_index.values.push_back(Q.z());
+			    t_q_index.values.push_back(index);
+			    msg_match_points.channels.push_back(t_q_index);
+			    pub_match_points.publish(msg_match_points);
+	    	}
+	        return true;
+	    }
+	}
+	//printf("loop final use num %d %lf--------------- \n", (int)matched_2d_cur.size(), t_match.toc());
+	return false;
+>>>>>>> 90dabb5ec79946ae42fd2e1e91d4e69aabe1e25d
 }
 
 // 计算两个描述子之间的汉明距离（表示两个相同长度的二进制串对应位置不同的字符数量）
@@ -597,5 +887,3 @@ BriefExtractor::BriefExtractor(const std::string& pattern_file)
 
   m_brief.importPairs(x1, y1, x2, y2);
 }
-
-

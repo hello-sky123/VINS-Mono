@@ -218,6 +218,7 @@ void CameraCalibration::drawResults(std::vector<cv::Mat>& images) const
 
     for (size_t j = 0; j < m_imagePoints.at(i).size(); ++j)
     {
+<<<<<<< HEAD
       cv::Point2f pObs = m_imagePoints.at(i).at(j);
       cv::Point2f pEst = estImagePoints.at(j);
 
@@ -238,6 +239,52 @@ void CameraCalibration::drawResults(std::vector<cv::Mat>& images) const
       {
         errorMax = error;
       }
+=======
+        cv::Mat& image = images.at(i);
+        if (image.channels() == 1)
+        {
+            cv::cvtColor(image, image, cv::COLOR_GRAY2RGB);
+        }
+
+        std::vector<cv::Point2f> estImagePoints;
+        m_camera->projectPoints(m_scenePoints.at(i), rvecs.at(i), tvecs.at(i),
+                                estImagePoints);
+
+        float errorSum = 0.0f;
+        float errorMax = std::numeric_limits<float>::min();
+
+        for (size_t j = 0; j < m_imagePoints.at(i).size(); ++j)
+        {
+            cv::Point2f pObs = m_imagePoints.at(i).at(j);
+            cv::Point2f pEst = estImagePoints.at(j);
+
+            cv::circle(image,
+                       cv::Point(cvRound(pObs.x * drawMultiplier),
+                                 cvRound(pObs.y * drawMultiplier)),
+                       5, green, 2, cv::LINE_AA, drawShiftBits);
+
+            cv::circle(image,
+                       cv::Point(cvRound(pEst.x * drawMultiplier),
+                                 cvRound(pEst.y * drawMultiplier)),
+                       5, red, 2, cv::LINE_AA, drawShiftBits);
+
+            float error = cv::norm(pObs - pEst);
+
+            errorSum += error;
+            if (error > errorMax)
+            {
+                errorMax = error;
+            }
+        }
+
+        std::ostringstream oss;
+        oss << "Reprojection error: avg = " << errorSum / m_imagePoints.at(i).size()
+            << "   max = " << errorMax;
+
+        cv::putText(image, oss.str(), cv::Point(10, image.rows - 10),
+                    cv::FONT_HERSHEY_COMPLEX, 0.5, cv::Scalar(255, 255, 255),
+                    1, cv::LINE_AA);
+>>>>>>> 90dabb5ec79946ae42fd2e1e91d4e69aabe1e25d
     }
 
     std::ostringstream oss;

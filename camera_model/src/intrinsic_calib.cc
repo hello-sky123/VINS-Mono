@@ -235,11 +235,39 @@ int main(int argc, char** argv)
 
     for (size_t i = 0; i < cbImages.size(); ++i)
     {
+<<<<<<< HEAD
       cv::putText(cbImages.at(i), cbImageFilenames.at(i), cv::Point(10,20),
                   cv::FONT_HERSHEY_COMPLEX, 0.5, cv::Scalar(255, 255, 255),
                   1, CV_AA);
       cv::imshow("Image", cbImages.at(i));
       cv::waitKey(0);
+=======
+        std::vector<cv::Mat> cbImages;
+        std::vector<std::string> cbImageFilenames;
+
+        for (size_t i = 0; i < imageFilenames.size(); ++i)
+        {
+            if (!chessboardFound.at(i))
+            {
+                continue;
+            }
+
+            cbImages.push_back(cv::imread(imageFilenames.at(i), -1));
+            cbImageFilenames.push_back(imageFilenames.at(i));
+        }
+
+        // visualize observed and reprojected points
+        calibration.drawResults(cbImages);
+
+        for (size_t i = 0; i < cbImages.size(); ++i)
+        {
+            cv::putText(cbImages.at(i), cbImageFilenames.at(i), cv::Point(10,20),
+                        cv::FONT_HERSHEY_COMPLEX, 0.5, cv::Scalar(255, 255, 255),
+                        1, cv::LINE_AA);
+            cv::imshow("Image", cbImages.at(i));
+            cv::waitKey(0);
+        }
+>>>>>>> 90dabb5ec79946ae42fd2e1e91d4e69aabe1e25d
     }
   }
 
